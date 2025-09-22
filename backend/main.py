@@ -1,0 +1,53 @@
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+from .database import create_tables
+from .routers import auth, data
+from .config import config
+
+app = FastAPI(title="RINT Data Manager", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.cors.get('allowed_origins', []),
+    allow_credentials=True,
+    allow_methods=config.cors.get('allowed_methods', []),
+    allow_headers=config.cors.get('allowed_headers', []),
+)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(data.router, prefix="/api/data", tags=["data"])
+
+@app.on_event("startup")
+def startup_event():
+    create_tables()
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        app, 
+        host=config.server.get('host', '0.0.0.0'), 
+        port=config.server.get('port', 8000),
+        reload=config.server.get('reload', True)
+    )
