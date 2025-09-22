@@ -12,6 +12,7 @@
         <div class="container">
             <a class="navbar-brand" href="/">RINT Data Manager</a>
             <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="#" id="adminLink" style="display: none;">Admin Panel</a>
                 <a class="nav-link" href="#" onclick="logout()">Logout</a>
             </div>
         </div>
@@ -94,9 +95,33 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let authToken = localStorage.getItem('token');
+        let currentUser = null;
         
         if (!authToken) {
             window.location.href = '/login';
+        }
+
+        async function loadCurrentUser() {
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    currentUser = await response.json();
+                    if (currentUser.is_admin) {
+                        document.getElementById('adminLink').style.display = 'block';
+                        document.getElementById('adminLink').href = '/admin';
+                    }
+                } else {
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Error loading current user:', error);
+                window.location.href = '/login';
+            }
         }
 
         async function loadDataItems() {
@@ -256,7 +281,9 @@
             }
         });
 
-        loadDataItems();
+        loadCurrentUser().then(() => {
+            loadDataItems();
+        });
     </script>
 </body>
 </html>

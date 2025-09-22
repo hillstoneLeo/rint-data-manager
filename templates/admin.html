@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - RINT Data Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">RINT Data Manager</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/dashboard">Dashboard</a>
+                <a class="nav-link active" href="/admin">Admin Panel</a>
+                <a class="nav-link" href="#" onclick="logout()">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>User Management</h2>
+                    <button class="btn btn-success" onclick="refreshUsers()">
+                        Refresh Users
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <div id="usersTable">
+                            <!-- Users table will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div class="modal fade" id="passwordResetModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reset User Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="passwordResetForm">
+                        <div class="mb-3">
+                            <label for="resetEmail" class="form-label">User Email</label>
+                            <input type="email" class="form-control" id="resetEmail" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="newPassword" required minlength="8">
+                            <div class="form-text">Password must be at least 8 characters long</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmNewPassword" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirmNewPassword" required minlength="8">
+                        </div>
+                        <input type="hidden" id="resetUserId">
+                        <button type="submit" class="btn btn-primary">Reset Password</button>
+                    </form>
+                    <div id="passwordResetMessage" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="confirmModalBody">
+                    Are you sure you want to perform this action?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmModalButton">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let authToken = localStorage.getItem('token');
+        let currentUser = null;
+        
+        if (!authToken) {
+            window.location.href = '/login';
+        }
+
+        async function loadCurrentUser() {
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    currentUser = await response.json();
+                    if (!currentUser.is_admin) {
+                        window.location.href = '/dashboard';
+                    }
+                } else {
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Error loading current user:', error);
+                window.location.href = '/login';
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const users = await response.json();
+                    displayUsers(users);
+                } else {
+                    console.error('Failed to load users');
+                    document.getElementById('usersTable').innerHTML = '<div class="alert alert-danger">Failed to load users</div>';
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('usersTable').innerHTML = '<div class="alert alert-danger">Network error occurred</div>';
+            }
+        }
+
+        function displayUsers(users) {
+            const container = document.getElementById('usersTable');
+            
+            if (users.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">No users found</div>';
+                return;
+            }
+            
+            let html = `
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Email</th>
+                            <th>Admin Status</th>
+                            <th>Created</th>
+<th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            
+            users.forEach(user => {
+                const isCurrentUser = user.id === currentUser.id;
+                html += `
+                    <tr>
+                        <td>${user.id}</td>
+                        <td>${user.email}</td>
+                        <td>
+                            <span class="badge ${user.is_admin ? 'bg-success' : 'bg-secondary'}">
+                                ${user.is_admin ? 'Admin' : 'User'}
+                            </span>
+                        </td>
+                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                        <td>
+                            ${!isCurrentUser ? `
+                                <button class="btn btn-sm ${user.is_admin ? 'btn-warning' : 'btn-primary'}" 
+                                        onclick="toggleAdminStatus(${user.id})">
+                                    ${user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                                </button>
+                                <button class="btn btn-sm btn-info" 
+                                        onclick="showPasswordResetModal(${user.id}, '${user.email}')">
+                                    Reset Password
+                                </button>
+                                <button class="btn btn-sm btn-danger" 
+                                        onclick="confirmDeleteUser(${user.id}, '${user.email}')">
+                                    Delete
+                                </button>
+                            ` : '<span class="text-muted">(You)</span>'}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        async function toggleAdminStatus(userId) {
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/admin`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    loadUsers();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to toggle admin status');
+                }
+            } catch (error) {
+                console.error('Error toggling admin status:', error);
+                alert('Network error occurred');
+            }
+        }
+
+        function confirmDeleteUser(userId, userEmail) {
+            const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+            document.getElementById('confirmModalTitle').textContent = 'Delete User';
+            document.getElementById('confirmModalBody').textContent = `Are you sure you want to delete user "${userEmail}"? This action cannot be undone.`;
+            
+            const confirmButton = document.getElementById('confirmModalButton');
+            confirmButton.textContent = 'Delete';
+            confirmButton.className = 'btn btn-danger';
+            confirmButton.onclick = () => deleteUser(userId);
+            
+            modal.show();
+        }
+
+        async function deleteUser(userId) {
+            try {
+                const response = await fetch(`/api/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
+                    loadUsers();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to delete user');
+                }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                alert('Network error occurred');
+            }
+        }
+
+        function refreshUsers() {
+            loadUsers();
+        }
+
+        function showPasswordResetModal(userId, userEmail) {
+            const modal = new bootstrap.Modal(document.getElementById('passwordResetModal'));
+            document.getElementById('resetUserId').value = userId;
+            document.getElementById('resetEmail').value = userEmail;
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+            document.getElementById('passwordResetMessage').innerHTML = '';
+            
+            modal.show();
+        }
+
+        document.getElementById('passwordResetForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const userId = document.getElementById('resetUserId').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmNewPassword').value;
+            const messageDiv = document.getElementById('passwordResetMessage');
+            
+            if (newPassword !== confirmPassword) {
+                messageDiv.innerHTML = '<div class="alert alert-danger">Passwords do not match</div>';
+                return;
+            }
+            
+            if (newPassword.length < 8) {
+                messageDiv.innerHTML = '<div class="alert alert-danger">Password must be at least 8 characters long</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/password`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        new_password: newPassword
+                    })
+                });
+                
+                if (response.ok) {
+                    messageDiv.innerHTML = '<div class="alert alert-success">Password reset successfully!</div>';
+                    setTimeout(() => {
+                        bootstrap.Modal.getInstance(document.getElementById('passwordResetModal')).hide();
+                    }, 2000);
+                } else {
+                    const error = await response.json();
+                    messageDiv.innerHTML = `<div class="alert alert-danger">${error.detail || 'Failed to reset password'}</div>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = '<div class="alert alert-danger">Network error occurred</div>';
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        }
+
+        // Initialize the page
+        loadCurrentUser().then(() => {
+            loadUsers();
+        });
+    </script>
+</body>
+</html>

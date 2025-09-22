@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from .database import create_tables
-from .routers import auth, data
+from .routers import auth, data, admin
 from .config import config
 
 app = FastAPI(title="RINT Data Manager", version="0.1.0")
@@ -22,6 +22,7 @@ templates = Jinja2Templates(directory="templates")
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(data.router, prefix="/api/data", tags=["data"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 @app.on_event("startup")
 def startup_event():
@@ -39,9 +40,17 @@ async def login_page(request: Request):
 async def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
+@app.get("/register-admin", response_class=HTMLResponse)
+async def register_admin_page(request: Request):
+    return templates.TemplateResponse("register-admin.html", {"request": request})
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request):
+    return templates.TemplateResponse("admin.html", {"request": request})
 
 if __name__ == "__main__":
     import uvicorn

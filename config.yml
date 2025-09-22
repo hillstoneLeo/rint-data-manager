@@ -20,10 +20,11 @@ upload:
   allowed_extensions: [".csv", ".json", ".txt", ".xlsx", ".parquet", ".h5", ".pkl", ".py", ".ipynb"]
 
 auth:
-  jwt_secret_key: "your-secret-key-here-change-in-production"
-  jwt_algorithm: "HS256"
-  jwt_expiration_minutes: 1440  # 24 hours
-  password_min_length: 8
+   jwt_secret_key: "your-secret-key-here-change-in-production"
+   jwt_algorithm: "HS256"
+   jwt_expiration_minutes: 1440  # 24 hours
+   password_min_length: 8
+   email_suffix_regex: ".*@hillstonenet\\.com$|.*@Hillstonenet\\.com$"
 
 cors:
   allowed_origins: ["http://localhost:8000", "http://127.0.0.1:8000"]
