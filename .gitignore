@@ -68,7 +68,6 @@ htmlcov/
 .dvc/config.local
 
 # Application specific
-static/uploads/
 temp/
 tmp/
 

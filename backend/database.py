@@ -36,6 +36,8 @@ class DataItem(Base):
     dvc_path = Column(String, nullable=True)
     file_size = Column(Integer, nullable=True)
     file_type = Column(String, nullable=True)
+    is_folder = Column(Boolean, default=False)
+    file_count = Column(Integer, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     parent_id = Column(Integer, ForeignKey("data_items.id"), nullable=True)
     created_at = Column(DateTime, default=func.now())

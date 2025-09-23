@@ -1,5 +1,25 @@
 # Admin User Management Guide
 
+## Registering the First Admin User
+
+To register as the first admin in the system, you have two options:
+
+### Web Interface Method
+
+1. **Navigate to the admin registration page**: Go to `/register-admin` in your browser
+2. **Fill out the form**: Enter your email and password (minimum 8 characters)
+3. **Submit**: Click "Register Admin"
+
+The system will only allow admin registration if no admin users already exist. Once the first admin is created, this endpoint becomes disabled.
+
+### Command Line Method
+
+```bash
+python db_manager.py make-admin <email>
+```
+
+The admin registration bypasses email domain restrictions and creates the user with admin privileges immediately.
+
 ## Web Interface Admin Capabilities
 
 Admin users can manage other users through the web interface at `/admin`:

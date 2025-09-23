@@ -43,6 +43,8 @@ class DataItemResponse(DataItemBase):
     dvc_path: Optional[str] = None
     file_size: Optional[int] = None
     file_type: Optional[str] = None
+    is_folder: Optional[bool] = False
+    file_count: Optional[int] = None
     user_id: int
     created_at: datetime
     user: UserResponse
@@ -53,9 +55,6 @@ class DataItemResponse(DataItemBase):
 class DataItemWithLineage(DataItemResponse):
     parent: Optional[DataItemResponse] = None
     children: List[DataItemResponse] = []
-    
-    class Config:
-        from_attributes = True
 
 class UploadResponse(BaseModel):
     message: str

@@ -5,13 +5,13 @@ from ..database import get_db
 from ..schemas import DataItemCreate, DataItemResponse, DataItemWithLineage, UploadResponse
 from ..auth import get_current_active_user
 from ..database import User
-from ..dvc_service import create_data_item, get_data_item_with_lineage, get_user_data_items
+from ..dvc_service import create_data_item, create_folder_data_item, get_data_item_with_lineage, get_user_data_items, get_all_data_items
 
 router = APIRouter()
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_data(
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     name: str = Form(...),
     source: str = Form(...),
     description: Optional[str] = Form(None),
@@ -26,10 +26,19 @@ async def upload_data(
         parent_id=parent_id
     )
     
-    data_item = await create_data_item(file, data_item_data, current_user, db)
+    # Check if this is a folder upload (multiple files with path separators)
+    is_folder_upload = len(files) > 1 or any('/' in (file.filename or '') or '\\' in (file.filename or '') for file in files)
+    
+    if is_folder_upload:
+        data_item = await create_folder_data_item(files, data_item_data, current_user, db)
+        message = f"Folder uploaded successfully with {len(files)} files"
+    else:
+        # Single file upload
+        data_item = await create_data_item(files[0], data_item_data, current_user, db)
+        message = "File uploaded successfully"
     
     return UploadResponse(
-        message="File uploaded successfully",
+        message=message,
         data_item=data_item
     )
 
@@ -37,10 +46,14 @@ async def upload_data(
 def list_data_items(
     skip: int = 0,
     limit: int = 100,
+    user_only: bool = True,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    return get_user_data_items(db, current_user, skip, limit)
+    if user_only:
+        return get_user_data_items(db, current_user, skip, limit)
+    else:
+        return get_all_data_items(db, skip, limit)
 
 @router.get("/{item_id}", response_model=DataItemWithLineage)
 def get_data_item(
