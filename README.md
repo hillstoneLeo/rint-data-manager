@@ -23,6 +23,10 @@ A DVC-based platform for data collection and sharing with naive lineage tracking
    ```bash
    sudo mkdir /opt/dvc_storage
    sudo chown $USER:$USER /opt/dvc_storage
+   mkdir /opt/dvc_storage/uploads  # defined in config.yml
+   cd /opt/dvc_storage/uploads
+   git init
+   dvc init
    ```
 
 3. **Review and update configuration**:

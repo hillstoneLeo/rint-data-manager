@@ -5,27 +5,35 @@ from pathlib import Path
 from typing import Optional
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
-from backend.database import DataItem, User
-from backend.schemas import DataItemCreate, DataItemResponse
-from backend.config import config
+from .database import DataItem, User
+from .schemas import DataItemCreate, DataItemResponse
+from .config import config
 
-UPLOAD_DIR = config.upload.get('directory', 'uploads')
+UPLOAD_DIR = config.upload.get('directory')
 DVC_STORAGE_DIR = config.dvc.get('storage_path', '/opt/dvc_storage')
 DVC_REMOTE_NAME = config.dvc.get('remote_name', 'local_storage')
+DVC_UPLOADS_PROJECT = config.dvc.get('uploads_dvc_project', '/opt/dvc_storage/uploads')
 
 def ensure_dvc_repo():
-    if not os.path.exists(".dvc"):
-        subprocess.run(["dvc", "init"], check=True)
+    # Ensure uploads DVC project exists
+    if not os.path.exists(DVC_UPLOADS_PROJECT):
+        os.makedirs(DVC_UPLOADS_PROJECT, exist_ok=True)
     
+    # Initialize DVC in uploads project if not already initialized
+    if not os.path.exists(os.path.join(DVC_UPLOADS_PROJECT, ".dvc")):
+        subprocess.run(["dvc", "init"], check=True, cwd=DVC_UPLOADS_PROJECT)
+    
+    # Ensure storage directory exists
     if not os.path.exists(DVC_STORAGE_DIR):
         os.makedirs(DVC_STORAGE_DIR, exist_ok=True)
     
-    remote_check = subprocess.run(["dvc", "remote", "list"], capture_output=True, text=True)
+    # Check and add remote in uploads DVC project
+    remote_check = subprocess.run(["dvc", "remote", "list"], capture_output=True, text=True, cwd=DVC_UPLOADS_PROJECT)
     if DVC_REMOTE_NAME not in remote_check.stdout:
         subprocess.run([
             "dvc", "remote", "add", "-d", DVC_REMOTE_NAME, 
             os.path.abspath(DVC_STORAGE_DIR)
-        ], check=True)
+        ], check=True, cwd=DVC_UPLOADS_PROJECT)
 
 async def save_upload_file(upload_file: UploadFile, destination: Path):
     try:
@@ -45,14 +53,14 @@ async def create_data_item(
 ) -> DataItemResponse:
     ensure_dvc_repo()
     
-    user_upload_dir = Path(UPLOAD_DIR) / str(user.id)
+    user_upload_dir = Path(UPLOAD_DIR or '/opt/dvc_storage/uploads') / str(user.id)
     user_upload_dir.mkdir(parents=True, exist_ok=True)
     
     file_path = user_upload_dir / file.filename
     await save_upload_file(file, file_path)
     
     file_size = file_path.stat().st_size
-    file_type = file.filename.split('.')[-1] if '.' in file.filename else None
+    file_type = file.filename.split('.')[-1] if file.filename and '.' in file.filename else None
     
     db_data_item = DataItem(
         name=data.name,
@@ -69,8 +77,10 @@ async def create_data_item(
     db.refresh(db_data_item)
     
     try:
-        subprocess.run(["dvc", "add", str(file_path)], check=True, capture_output=True)
-        subprocess.run(["dvc", "push"], check=True, capture_output=True)
+        # Run DVC commands from the uploads DVC project directory
+        relative_file_path = os.path.relpath(str(file_path), DVC_UPLOADS_PROJECT)
+        subprocess.run(["dvc", "add", relative_file_path], check=True, capture_output=True, cwd=DVC_UPLOADS_PROJECT)
+        subprocess.run(["dvc", "push"], check=True, capture_output=True, cwd=DVC_UPLOADS_PROJECT)
         
         dvc_file_path = str(file_path) + ".dvc"
         if os.path.exists(dvc_file_path):
