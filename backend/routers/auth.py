@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
 import re
-from ..database import get_db, User
+from ..database import get_db, User, ensure_tables_exist
 from ..schemas import UserCreate, UserLogin, Token, UserResponse
 from ..auth import authenticate_user, create_access_token, get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_active_user
 from ..config import config
@@ -22,6 +22,9 @@ def validate_email_domain(email: str) -> bool:
 @router.post("/register", response_model=UserResponse)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     from ..database import User
+    
+    # Ensure tables exist before proceeding
+    ensure_tables_exist()
     
     # Validate email domain
     if not validate_email_domain(user.email):
@@ -50,6 +53,9 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/register-admin", response_model=UserResponse)
 def register_admin(user: UserCreate, db: Session = Depends(get_db)):
     from ..database import User
+    
+    # Ensure tables exist before proceeding
+    ensure_tables_exist()
     
     # Check if any admin users already exist
     existing_admin = db.query(User).filter(User.is_admin == True).first()
@@ -81,6 +87,9 @@ def register_admin(user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
     from ..database import User
+    
+    # Ensure tables exist before proceeding
+    ensure_tables_exist()
     
     user = authenticate_user(db, user_credentials.email, user_credentials.password)
     if not user:

@@ -10,10 +10,10 @@ from .database import DataItem, User
 from .schemas import DataItemCreate, DataItemResponse
 from .config import config
 
-UPLOAD_DIR = config.upload.get('directory')
-DVC_STORAGE_DIR = config.dvc.get('storage_path', '/opt/dvc_storage')
-DVC_REMOTE_NAME = config.dvc.get('remote_name', 'local_storage')
-DVC_UPLOADS_PROJECT = config.dvc.get('uploads_dvc_project', '/opt/dvc_storage/uploads')
+UPLOAD_DIR = config.dvc_config.get('upload_directory', '/tmp/rdm/uploads')
+DVC_STORAGE_DIR = config.dvc_config.get('storage_path', '/opt/dvc_storage')
+DVC_REMOTE_NAME = config.dvc_config.get('remote_name', 'local_storage')
+DVC_UPLOADS_PROJECT = config.dvc_config.get('uploads_dvc_project', '/tmp/rdm/uploads')
 
 def ensure_dvc_repo():
     # Ensure uploads DVC project exists
@@ -22,6 +22,8 @@ def ensure_dvc_repo():
     
     # Initialize DVC in uploads project if not already initialized
     if not os.path.exists(os.path.join(DVC_UPLOADS_PROJECT, ".dvc")):
+        Path(DVC_UPLOADS_PROJECT).mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init"], check=True, cwd=DVC_UPLOADS_PROJECT)
         subprocess.run(["dvc", "init"], check=True, cwd=DVC_UPLOADS_PROJECT)
     
     # Ensure storage directory exists
@@ -54,7 +56,7 @@ async def create_folder_data_item(
 ) -> DataItemResponse:
     ensure_dvc_repo()
     
-    user_upload_dir = Path(UPLOAD_DIR or '/opt/dvc_storage/uploads') / str(user.id)
+    user_upload_dir = Path(UPLOAD_DIR or '/tmp/rdm/uploads') / str(user.id)
     user_upload_dir.mkdir(parents=True, exist_ok=True)
     
     # Create a unique folder name for this upload
@@ -138,7 +140,7 @@ async def create_data_item(
 ) -> DataItemResponse:
     ensure_dvc_repo()
     
-    user_upload_dir = Path(UPLOAD_DIR or '/opt/dvc_storage/uploads') / str(user.id)
+    user_upload_dir = Path(UPLOAD_DIR or '/tmp/rdm/uploads') / str(user.id)
     user_upload_dir.mkdir(parents=True, exist_ok=True)
     
     # Handle folder structure by preserving relative paths

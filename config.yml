@@ -11,14 +11,36 @@ database:
   echo: false
 
 dvc:
+  # Common storage configuration
   storage_path: "/opt/dvc_storage"
+  
+  # Internal DVC operations (existing functionality)
   remote_name: "local_storage"
-  uploads_dvc_project: "/opt/dvc_storage/uploads"
-
-upload:
-  directory: "/opt/dvc_storage/uploads"
+  uploads_dvc_project: "/tmp/rdm/uploads"
+  
+  # Upload configuration
+  upload_directory: "/tmp/rdm/uploads"
   max_file_size: 104857600  # 100MB in bytes
   allowed_extensions: [".csv", ".json", ".txt", ".xlsx", ".parquet", ".h5", ".pkl", ".py", ".ipynb"]
+  
+  # HTTP remote server (new functionality)
+  remote_server:
+    enabled: true
+    auth:
+      enabled: true
+      method: "database"  # database, basic, custom, none
+      database_auth:
+        require_admin: false  # Whether only admin users can access DVC remote
+        allowed_users: []  # Empty list means all registered users can access
+      basic_auth:
+        username: "dvc_user"
+        password: "dvc_password"
+      custom_auth:
+        header_name: "X-DVC-Token"
+        token: "your-custom-token-here"
+    ssl_verify: true
+    read_timeout: 300
+    connect_timeout: 300
 
 auth:
    jwt_secret_key: "your-secret-key-here-change-in-production"

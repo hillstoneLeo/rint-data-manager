@@ -67,3 +67,14 @@ def get_db():
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+
+def ensure_tables_exist():
+    """Check if tables exist and create them if they don't"""
+    try:
+        # Try to query the first user to see if tables exist
+        db = SessionLocal()
+        db.query(User).first()
+        db.close()
+    except Exception:
+        # If there's an error, tables likely don't exist, so create them
+        create_tables()

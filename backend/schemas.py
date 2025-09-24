@@ -59,3 +59,22 @@ class DataItemWithLineage(DataItemResponse):
 class UploadResponse(BaseModel):
     message: str
     data_item: DataItemResponse
+
+class DVCFileResponse(BaseModel):
+    path: str
+    size: int
+    modified: float
+    exists: bool
+    user_email: Optional[str] = None
+
+class DVCUploadResponse(BaseModel):
+    status: str
+    path: str
+    user_email: Optional[str] = None
+
+class DVCUserInfo(BaseModel):
+    authenticated: bool
+    user_id: Optional[int] = None
+    email: Optional[str] = None
+    is_admin: Optional[bool] = None
+    created_at: Optional[datetime] = None

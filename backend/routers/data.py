@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from ..database import get_db
+from ..database import get_db, ensure_tables_exist
 from ..schemas import DataItemCreate, DataItemResponse, DataItemWithLineage, UploadResponse
 from ..auth import get_current_active_user
 from ..database import User
@@ -19,6 +19,9 @@ async def upload_data(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    # Ensure tables exist before proceeding
+    ensure_tables_exist()
+    
     data_item_data = DataItemCreate(
         name=name,
         source=source,
@@ -50,6 +53,9 @@ def list_data_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    # Ensure tables exist before proceeding
+    ensure_tables_exist()
+    
     if user_only:
         return get_user_data_items(db, current_user, skip, limit)
     else:
@@ -61,6 +67,9 @@ def get_data_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    # Ensure tables exist before proceeding
+    ensure_tables_exist()
+    
     data_item = get_data_item_with_lineage(db, item_id, current_user)
     if not data_item:
         raise HTTPException(

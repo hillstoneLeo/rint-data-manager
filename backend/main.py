@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import create_tables
 from .routers import auth, data, admin
 from .routers.log import router as log_router
+from .routers.dvc_remote import router as dvc_remote_router
 from .config import config
 
 app = FastAPI(title="RINT Data Manager", version="0.1.0")
@@ -24,6 +25,7 @@ templates = Jinja2Templates(directory="templates")
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(data.router, prefix="/api/data", tags=["data"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(dvc_remote_router, prefix="/dvc", tags=["dvc_remote"])
 app.include_router(log_router, prefix="/api/log", tags=["log"])
 
 @app.on_event("startup")

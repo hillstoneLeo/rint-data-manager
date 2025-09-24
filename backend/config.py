@@ -36,12 +36,14 @@ class Config:
         return self._config.get('database', {})
     
     @property
-    def dvc(self) -> Dict[str, Any]:
+    def dvc_config(self) -> Dict[str, Any]:
+        """Get DVC configuration"""
         return self._config.get('dvc', {})
     
     @property
-    def upload(self) -> Dict[str, Any]:
-        return self._config.get('upload', {})
+    def dvc_remote(self) -> Dict[str, Any]:
+        """Backward compatibility - access remote server config through dvc section"""
+        return self._config.get('dvc', {}).get('remote_server', {})
     
     @property
     def auth(self) -> Dict[str, Any]:
@@ -54,5 +56,18 @@ class Config:
     @property
     def logging(self) -> Dict[str, Any]:
         return self._config.get('logging', {})
+    
+    def get_dvc_storage_path(self) -> str:
+        """Get DVC storage path with backward compatibility"""
+        # Try new unified structure first
+        dvc_config = self._config.get('dvc', {})
+        if 'storage_path' in dvc_config:
+            return dvc_config['storage_path']
+        
+        # Fall back to old structure for backward compatibility
+        if 'dvc_remote' in self._config:
+            return self._config['dvc_remote'].get('storage_path', '/opt/dvc_storage')
+        
+        return '/opt/dvc_storage'
 
 config = Config()
