@@ -12,7 +12,6 @@ router = APIRouter()
 @router.post("/upload", response_model=UploadResponse)
 async def upload_data(
     files: List[UploadFile] = File(...),
-    name: str = Form(...),
     source: str = Form(...),
     description: Optional[str] = Form(None),
     parent_id: Optional[int] = Form(None),
@@ -23,7 +22,6 @@ async def upload_data(
     ensure_tables_exist()
     
     data_item_data = DataItemCreate(
-        name=name,
         source=source,
         description=description,
         parent_id=parent_id

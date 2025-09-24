@@ -69,10 +69,7 @@
                             <input type="file" class="form-control" id="uploadFile" required multiple>
                             <div class="form-text" id="uploadHelpText">Select one or more files to upload.</div>
                         </div>
-                        <div class="mb-3">
-                            <label for="itemName" class="form-label">Name</label>
-                            <input type="text" class="form-control" id="itemName" required>
-                        </div>
+                        
                         <div class="mb-3">
                             <label for="itemSource" class="form-label">Source</label>
                             <input type="text" class="form-control" id="itemSource" required>
@@ -329,7 +326,7 @@
                 formData.append('files', files[i]);
             }
             
-            formData.append('name', document.getElementById('itemName').value);
+            
             formData.append('source', document.getElementById('itemSource').value);
             formData.append('description', document.getElementById('itemDescription').value);
             

@@ -59,8 +59,12 @@ async def create_folder_data_item(
     user_upload_dir = Path(UPLOAD_DIR or '/tmp/rdm/uploads') / str(user.id)
     user_upload_dir.mkdir(parents=True, exist_ok=True)
     
-    # Create a unique folder name for this upload
-    folder_name = data.name.replace(' ', '_').lower()
+    # Create a unique folder name for this upload using the first filename
+    first_file_name = files[0].filename or 'unknown_file'
+    # Extract just the filename without path and remove extension
+    folder_base_name = first_file_name.split('/')[-1].split('\\')[-1]
+    folder_base_name = folder_base_name.rsplit('.', 1)[0] if '.' in folder_base_name else folder_base_name
+    folder_name = folder_base_name.replace(' ', '_').lower()
     folder_path = user_upload_dir / folder_name
     folder_path.mkdir(parents=True, exist_ok=True)
     
@@ -83,7 +87,7 @@ async def create_folder_data_item(
     
     # Create single data item for the folder (size and file_count will be updated after DVC add)
     db_data_item = DataItem(
-        name=data.name,
+        name=folder_base_name,
         description=data.description,
         source=data.source,
         file_path=str(folder_path),
@@ -114,7 +118,7 @@ async def create_folder_data_item(
                 dvc_out = dvc_content['outs'][0]
                 db_data_item.file_size = dvc_out.get('size', 0)
                 db_data_item.file_count = dvc_out.get('nfiles', len(files))
-                db_data_item.dvc_path = dvc_file_path
+                db_data_item.hash = dvc_out.get('md5', '')
             
             db.commit()
             db.refresh(db_data_item)
@@ -161,11 +165,8 @@ async def create_data_item(
     file_size = file_path.stat().st_size
     file_type = file_name.split('.')[-1] if '.' in file_name else None
     
-    # Create a unique name for each file in a folder upload
-    display_name = data.name
-    if file_name != data.name:
-        # If uploading multiple files, append the filename to distinguish them
-        display_name = f"{data.name} - {file_name}"
+    # Use the actual filename as the display name
+    display_name = file_name.split('/')[-1].split('\\')[-1]  # Get just the filename without path
     
     db_data_item = DataItem(
         name=display_name,
@@ -190,8 +191,11 @@ async def create_data_item(
         dvc_file_path = str(file_path) + ".dvc"
         if os.path.exists(dvc_file_path):
             with open(dvc_file_path, 'r') as f:
-                dvc_content = f.read()
-                db_data_item.dvc_path = dvc_file_path
+                dvc_content = yaml.safe_load(f)
+                
+            if dvc_content and 'outs' in dvc_content and len(dvc_content['outs']) > 0:
+                dvc_out = dvc_content['outs'][0]
+                db_data_item.hash = dvc_out.get('md5', '')
             
             db.commit()
             db.refresh(db_data_item)

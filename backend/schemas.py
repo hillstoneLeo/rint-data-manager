@@ -29,7 +29,6 @@ class Token(BaseModel):
     token_type: str
 
 class DataItemBase(BaseModel):
-    name: str
     description: Optional[str] = None
     source: str
     parent_id: Optional[int] = None
@@ -39,8 +38,9 @@ class DataItemCreate(DataItemBase):
 
 class DataItemResponse(DataItemBase):
     id: int
+    name: str
     file_path: str
-    dvc_path: Optional[str] = None
+    hash: Optional[str] = None
     file_size: Optional[int] = None
     file_type: Optional[str] = None
     is_folder: Optional[bool] = False

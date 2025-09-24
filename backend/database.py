@@ -33,7 +33,7 @@ class DataItem(Base):
     description = Column(Text, nullable=True)
     source = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
-    dvc_path = Column(String, nullable=True)
+    hash = Column(String, nullable=True)
     file_size = Column(Integer, nullable=True)
     file_type = Column(String, nullable=True)
     is_folder = Column(Boolean, default=False)
