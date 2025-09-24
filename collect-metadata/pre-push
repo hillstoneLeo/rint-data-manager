@@ -1,0 +1,49 @@
+#!/bin/bash
+# DVC Metadata Upload Hook (pre-push version)
+# Uploads .dvc files before pushing to remote
+
+set -e
+
+# Configuration
+SERVER_URL="http://localhost:8000/api/v1/data/upload-metadata"
+USER_ID="1"
+AUTH_TOKEN=""
+
+# Read stdin to get push details
+while read local_ref local_sha remote_ref remote_sha; do
+    # Find .dvc files that are being pushed
+    dvc_files=$(git diff --name-only "$local_sha" "$remote_sha" 2>/dev/null | grep '\.dvc$' || true)
+    
+    if [ -n "$dvc_files" ]; then
+        echo "Uploading DVC metadata for pushed files..."
+        
+        for dvc_file in $dvc_files; do
+            if [ -f "$dvc_file" ]; then
+                echo "Uploading metadata for: $dvc_file"
+                
+                if [ -n "$AUTH_TOKEN" ]; then
+                    curl -X POST "$SERVER_URL" \
+                         -H "Authorization: Bearer $AUTH_TOKEN" \
+                         -F "dvc_file=@$dvc_file" \
+                         -F "user_id=$USER_ID" \
+                         --silent --show-error --fail
+                else
+                    curl -X POST "$SERVER_URL" \
+                         -F "dvc_file=@$dvc_file" \
+                         -F "user_id=$USER_ID" \
+                         --silent --show-error --fail
+                fi
+                
+                if [ $? -eq 0 ]; then
+                    echo "✓ Successfully uploaded: $dvc_file"
+                else
+                    echo "✗ Failed to upload: $dvc_file" >&2
+                    exit 1
+                fi
+            fi
+        done
+    fi
+done
+
+# Continue with the push
+exit 0
