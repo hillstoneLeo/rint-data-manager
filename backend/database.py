@@ -47,6 +47,19 @@ class DataItem(Base):
     parent = relationship("DataItem", remote_side=[id], back_populates="children")
     children = relationship("DataItem", back_populates="parent")
 
+class UploadedMetadata(Base):
+    __tablename__ = "uploaded_metadata"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    file_hash = Column(String, nullable=False, index=True)  # To match with data_items.hash
+    original_filename = Column(String, nullable=False)     # From .dvc file parsing
+    host_ip = Column(String, nullable=True)                # From HTTP request client
+    username = Column(String, nullable=True)               # From form field
+    created_at = Column(DateTime, default=func.now())
+    
+    # Relationship to DataItem (optional, for easy joins)
+    data_item = relationship("DataItem", foreign_keys=[file_hash], primaryjoin="UploadedMetadata.file_hash == foreign(DataItem.hash)")
+
 class UploadLog(Base):
     __tablename__ = "upload_logs"
     

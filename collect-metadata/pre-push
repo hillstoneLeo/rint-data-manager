@@ -5,9 +5,10 @@
 set -e
 
 # Configuration
-SERVER_URL="http://localhost:8000/api/v1/data/upload-metadata"
-USER_ID="1"
-AUTH_TOKEN=""
+SERVER_URL="http://localhost:8000/api/data/upload-metadata"
+
+# Get DVC user if available, fallback to system user
+DVC_USER=$(dvc config core.user 2>/dev/null || echo "${USER:-$(whoami)}")
 
 # Read stdin to get push details
 while read local_ref local_sha remote_ref remote_sha; do
@@ -21,18 +22,10 @@ while read local_ref local_sha remote_ref remote_sha; do
             if [ -f "$dvc_file" ]; then
                 echo "Uploading metadata for: $dvc_file"
                 
-                if [ -n "$AUTH_TOKEN" ]; then
-                    curl -X POST "$SERVER_URL" \
-                         -H "Authorization: Bearer $AUTH_TOKEN" \
-                         -F "dvc_file=@$dvc_file" \
-                         -F "user_id=$USER_ID" \
-                         --silent --show-error --fail
-                else
-                    curl -X POST "$SERVER_URL" \
-                         -F "dvc_file=@$dvc_file" \
-                         -F "user_id=$USER_ID" \
-                         --silent --show-error --fail
-                fi
+                curl -X POST "$SERVER_URL" \
+                     -F "dvc_file=@$dvc_file" \
+                     -F "username=$DVC_USER" \
+                     --silent --show-error --fail
                 
                 if [ $? -eq 0 ]; then
                     echo "✓ Successfully uploaded: $dvc_file"

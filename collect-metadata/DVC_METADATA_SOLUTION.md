@@ -64,8 +64,9 @@ class DataItemResponse(DataItemBase):
 **Features:**
 - Scans repository for all `.dvc` files
 - Uploads each `.dvc` file to the server
-- Configurable server URL and user ID
-- Supports authentication tokens
+- Uses DVC user identity when available, falls back to system user
+- Configurable server URL
+- No authentication required
 
 #### Alternative: `pre-push` hook
 **Location:** `.git/hooks/pre-push`
@@ -74,6 +75,7 @@ class DataItemResponse(DataItemBase):
 - Only uploads `.dvc` files that are being pushed
 - More efficient for large repositories
 - Can block push if upload fails
+- Uses DVC user identity for better tracking
 
 ### 3. Installation Scripts
 
@@ -93,8 +95,8 @@ Automated installation script that:
 ### 2. Configure Hooks
 Edit the hook scripts to set:
 - `SERVER_URL`: Your server endpoint
-- `USER_ID`: User ID for metadata uploads
-- `AUTH_TOKEN`: Authentication token (if required)
+- DVC user is automatically extracted from `dvc config core.user`
+- System user is used as fallback if DVC user is not configured
 
 ### 4. User Workflow
 
@@ -117,11 +119,11 @@ dvc push
 
 **Request:**
 ```http
-POST /api/v1/data/upload-metadata
+POST /api/data/upload-metadata
 Content-Type: multipart/form-data
 
 dvc_file=@my_data.csv.dvc
-user_id=1
+username=dvc_user_name
 ```
 
 **Response:**
@@ -143,6 +145,7 @@ user_id=1
 3. **Automatic**: Git hooks handle metadata upload automatically
 4. **Backward Compatible**: Existing uploads continue to work
 5. **Flexible**: Supports both `post-commit` and `pre-push` hooks
+6. **Better User Tracking**: Uses DVC user identity for more meaningful metadata
 
 ## Files Modified
 
@@ -157,13 +160,16 @@ user_id=1
 
 1. **Test API Endpoint:**
 ```bash
-curl -X POST http://localhost:8000/api/v1/data/upload-metadata \
+curl -X POST http://localhost:8000/api/data/upload-metadata \
      -F "dvc_file=@test.dvc" \
-     -F "user_id=1"
+     -F "username=dvc_user_name"
 ```
 
 2. **Test Git Hook:**
 ```bash
+# Configure DVC user (optional)
+dvc config core.user "your_dvc_username"
+
 # Create a test .dvc file
 echo "outs:
 - md5: test123
@@ -189,7 +195,7 @@ usql -c 'select name, original_filename from data_items;' rint_data_manager.db
 ### Upload Failing
 - Check server URL in hook configuration
 - Verify server is running
-- Check authentication if required
+- Check DVC user configuration: `dvc config core.user`
 - Test endpoint manually with curl
 
 ### Database Issues

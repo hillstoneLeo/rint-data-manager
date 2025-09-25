@@ -72,6 +72,23 @@ class DVCUploadResponse(BaseModel):
     path: str
     user_email: Optional[str] = None
 
+class UploadedMetadataResponse(BaseModel):
+    id: int
+    file_hash: str
+    original_filename: str
+    host_ip: Optional[str] = None
+    username: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class MetadataUploadResponse(BaseModel):
+    message: str
+    metadata_id: int
+    file_hash: str
+    original_filename: str
+
 class DVCUserInfo(BaseModel):
     authenticated: bool
     user_id: Optional[int] = None
