@@ -36,15 +36,14 @@ services:
         https_proxy: http://10.160.43.82:7897
     container_name: rint-client-a
     environment:
-      - CONTAINER_TYPE=client_a
+      - CONTAINER_NAME=client_a
       - HTTP_PROXY=http://10.160.43.82:7897
       - HTTPS_PROXY=http://10.160.43.82:7897
       - http_proxy=http://10.160.43.82:7897
       - https_proxy=http://10.160.43.82:7897
       - NO_PROXY=localhost,127.0.0.1,*.local
     volumes:
-      - client_a_data:/workspace
-      - dvc_storage:/opt/dvc_storage
+      - client_a_data:/home
     networks:
       - demo-network
     depends_on:
@@ -64,15 +63,14 @@ services:
         https_proxy: http://10.160.43.82:7897
     container_name: rint-client-b
     environment:
-      - CONTAINER_TYPE=client_b
+      - CONTAINER_NAME=client_b
       - HTTP_PROXY=http://10.160.43.82:7897
       - HTTPS_PROXY=http://10.160.43.82:7897
       - http_proxy=http://10.160.43.82:7897
       - https_proxy=http://10.160.43.82:7897
       - NO_PROXY=localhost,127.0.0.1,*.local
     volumes:
-      - client_b_data:/workspace
-      - dvc_storage:/opt/dvc_storage
+      - client_b_data:/home
     networks:
       - demo-network
     depends_on:

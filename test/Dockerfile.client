@@ -1,7 +1,5 @@
 FROM python:3.12-slim
 
-WORKDIR /workspace
-
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
@@ -19,7 +17,8 @@ ENV PATH="/root/.local/bin:$PATH"
 # Install DVC and git
 RUN uv pip install --system dvc[all] && \
     git config --global user.name "Demo User" && \
-    git config --global user.email "demo@example.com"
+    git config --global user.email "demo@hillstonenet.com" && \
+    git config --global init.defaultBranch master
 
 # Copy DVC hooks installation script
 COPY collect-metadata/install-dvc-hooks.sh /usr/local/bin/install-dvc-hooks.sh
@@ -78,7 +77,8 @@ create_user() {
 
         # Setup git config for user
         sudo -u "$username" git config --global user.name "$username"
-        sudo -u "$username" git config --global user.email "$username@example.com"
+        sudo -u "$username" git config --global user.email "$username@hillstonenet.com"
+        sudo -u "$username" git config --global init.defaultBranch master
         
         echo "User $username created successfully"
     else
@@ -87,18 +87,22 @@ create_user() {
 }
 
 # Container A: alice and bob
-if [ "$CONTAINER_TYPE" = "client_a" ]; then
+if [ "$CONTAINER_NAME" = "client_a" ]; then
     create_user "alice" "alice123"
     create_user "bob" "bob123"
 fi
 
 # Container B: cindy
-if [ "$CONTAINER_TYPE" = "client_b" ]; then
+if [ "$CONTAINER_NAME" = "client_b" ]; then
     create_user "cindy" "cindy123"
 fi
 EOF
 
 RUN chmod +x /usr/local/bin/setup-users
+
+# Copy setup demo script
+COPY test/setup-demo.sh /usr/local/bin/setup-demo.sh
+RUN chmod +x /usr/local/bin/setup-demo.sh
 
 # Create entrypoint script
 RUN cat > /entrypoint.sh << 'EOF'
@@ -108,7 +112,7 @@ RUN cat > /entrypoint.sh << 'EOF'
 set -e
 
 # Setup users based on container type
-export CONTAINER_TYPE=${CONTAINER_TYPE:-client_a}
+export CONTAINER_NAME=${CONTAINER_NAME:-client_a}
 setup-users
 
 # SSH service disabled for demo - containers work without SSH

@@ -12,9 +12,9 @@ setup_user_workspace() {
     
     echo "Setting up workspace for $username..."
     
-    # Create project directory
-    sudo -u "$username" mkdir -p "/workspace/$username/$project_name"
-    cd "/workspace/$username/$project_name"
+    # Create project directory in user's home directory
+    sudo -u "$username" mkdir -p "/home/$username/$project_name"
+    cd "/home/$username/$project_name"
     
     # Initialize git repository
     sudo -u "$username" git init
@@ -22,11 +22,14 @@ setup_user_workspace() {
     # Initialize DVC
     sudo -u "$username" dvc init
     
-    # Configure DVC remote to use shared storage
-    sudo -u "$username" dvc remote add -d myremote /opt/dvc_storage
+    # Configure DVC remote to use HTTP server
+    sudo -u "$username" dvc remote add -d myremote http://server:7123/dvc
+    sudo -u "$username" dvc remote modify myremote auth basic
+    sudo -u "$username" dvc remote modify myremote user $username@hillstonenet.com
+    sudo -u "$username" dvc remote modify myremote password ${username}123
     
     # Install DVC hooks
-    setup-dvc-hooks "/workspace/$username/$project_name"
+    setup-dvc-hooks "/home/$username/$project_name"
     
     # Create sample data file
     sudo -u "$username" cat > sample_data.csv << 'EOF'
@@ -47,13 +50,13 @@ EOF
 }
 
 # Container A: Setup alice and bob workspaces
-if [ "$CONTAINER_TYPE" = "client_a" ]; then
+if [ "$CONTAINER_NAME" = "client_a" ]; then
     setup_user_workspace "alice" "demo-project"
     setup_user_workspace "bob" "data-analysis"
 fi
 
 # Container B: Setup cindy workspace
-if [ "$CONTAINER_TYPE" = "client_b" ]; then
+if [ "$CONTAINER_NAME" = "client_b" ]; then
     setup_user_workspace "cindy" "ml-experiment"
 fi
 

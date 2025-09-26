@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from ..database import get_db, ensure_tables_exist, UploadedMetadata
+from ..database import get_db, ensure_tables_exist, UploadedMetadata, DataItem
 from ..schemas import DataItemCreate, DataItemResponse, DataItemWithLineage, UploadResponse, UploadedMetadataResponse, MetadataUploadResponse
 from ..auth import get_current_active_user
 from ..database import User
@@ -129,6 +129,15 @@ async def upload_metadata(
             existing_metadata.original_filename = original_filename  # type: ignore
             existing_metadata.host_ip = host_ip  # type: ignore
             existing_metadata.username = username  # type: ignore
+            
+            # Check if there's a matching DataItem and update name if it's hash-based
+            data_item = db.query(DataItem).filter(DataItem.hash == file_hash).first()
+            if data_item is not None:
+                item_name = str(data_item.name) if data_item.name is not None else ""
+                if item_name.startswith('dvc_file_') or item_name.startswith('dvc_dir_'):
+                    # Update name only if it's a hash-based fallback
+                    data_item.name = original_filename  # type: ignore
+            
             db.commit()
             db.refresh(existing_metadata)
             
@@ -148,6 +157,15 @@ async def upload_metadata(
                 username=username
             )
             db.add(metadata_record)
+            
+            # Check if there's a matching DataItem and update name if it's hash-based
+            data_item = db.query(DataItem).filter(DataItem.hash == file_hash).first()
+            if data_item is not None:
+                item_name = str(data_item.name) if data_item.name is not None else ""
+                if item_name.startswith('dvc_file_') or item_name.startswith('dvc_dir_'):
+                    # Update name only if it's a hash-based fallback
+                    data_item.name = original_filename  # type: ignore
+            
             db.commit()
             db.refresh(metadata_record)
             

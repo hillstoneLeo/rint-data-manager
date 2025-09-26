@@ -69,7 +69,7 @@ Register and login with these credentials:
 ### 2. DVC Integration
 - Pre-installed DVC client in all containers
 - Automatic git hooks for metadata upload
-- Shared DVC storage across containers
+- HTTP remote storage pointing to Rint Data Manager server
 - Sample projects with DVC tracking
 
 ### 3. Automated Workflows
@@ -86,15 +86,14 @@ Register and login with these credentials:
 4. Explore the dashboard and admin interface
 
 ### Step 2: Client Container Demo
-1. SSH into Client A:
+1. Access Client A container:
    ```bash
-   ssh alice@localhost -p 2222
-   # Password: alice123
+   cd test && docker compose exec client_a sudo -u alice bash
    ```
 
-2. Navigate to the demo project:
+2. Navigate to alice's demo project:
    ```bash
-   cd /workspace/alice/demo-project
+   cd /home/alice/demo-project
    ```
 
 3. Explore the existing DVC project:
@@ -122,7 +121,7 @@ Register and login with these credentials:
 
 2. Navigate to bob's project:
    ```bash
-   cd /workspace/bob/data-analysis
+   cd /home/bob/data-analysis
    ```
 
 3. Create and track data:
@@ -141,7 +140,7 @@ Register and login with these credentials:
 
 5. Work on ML experiment:
    ```bash
-   cd /workspace/cindy/ml-experiment
+   cd /home/cindy/ml-experiment
    echo "ml experiment data" > experiment.json
    dvc add experiment.json
    git add .
@@ -174,7 +173,7 @@ Register and login with these credentials:
 
 ### Volume Structure
 ```
-dvc_storage/          # Shared DVC storage (content-addressable)
+dvc_storage/          # Server DVC storage (managed by Rint Data Manager)
 ├── cache/             # DVC cache directory
 │   └── files/         # Actual data files stored by MD5 hash
 │       └── md5/       # Files organized by content hash
@@ -192,10 +191,12 @@ client_b_data/        # Client B workspace
 └── cindy/            # Cindy's projects (with .dvc files)
 ```
 
-**Note**: DVC uses content-addressable storage where all files from all users are stored together in `/opt/dvc_storage/files/md5/` organized by their MD5 hashes. This means:
-- Files with identical content are stored only once (deduplication)
+**Note**: DVC uses HTTP remote storage pointing to `http://server:7123/dvc`. This means:
+- All DVC data is stored and managed by the Rint Data Manager server in `/opt/dvc_storage`
 - User separation is maintained through DVC metadata (.dvc files) in each project
-- All users share the same physical storage pool for efficiency
+- No shared storage volume is needed between containers - clients communicate with server via HTTP
+- The server maintains its own DVC storage for handling client uploads and data management
+- DVC hooks automatically upload .dvc metadata files to the server after git commits
 
 ## Development and Testing
 
@@ -207,12 +208,14 @@ docker-compose up --build
 # Wait for containers to fully start (check logs with: docker-compose logs -f server)
 
 # Setup demo environment (creates sample projects and configures DVC)
-docker-compose exec client_a bash /workspace/setup-demo.sh
-docker-compose exec client_b bash /workspace/setup-demo.sh
+docker-compose exec client_a bash -c "CONTAINER_TYPE=client_a sudo -u alice /home/alice/setup-demo.sh"
+docker-compose exec client_a bash -c "CONTAINER_TYPE=client_a sudo -u bob /home/bob/setup-demo.sh"
+docker-compose exec client_b bash -c "CONTAINER_TYPE=client_b sudo -u cindy /home/cindy/setup-demo.sh"
 
 # Run demo script in client containers
-docker-compose exec client_a bash /workspace/demo.sh
-docker-compose exec client_b bash /workspace/demo.sh
+docker-compose exec client_a sudo -u alice bash /home/alice/demo.sh
+docker-compose exec client_a sudo -u bob bash /home/bob/demo.sh
+docker-compose exec client_b sudo -u cindy bash /home/cindy/demo.sh
 
 # View logs
 docker-compose logs -f server

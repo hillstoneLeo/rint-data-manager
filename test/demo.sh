@@ -19,10 +19,10 @@ demo_user_operations() {
     
     # Show current directory and files
     echo "Current workspace:"
-    ls -la /workspace/$username/
+    ls -la /home/$username/
     
     # Navigate to project
-    cd "/workspace/$username/demo-project" 2>/dev/null || cd "/workspace/$username/data-analysis" 2>/dev/null || cd "/workspace/$username/ml-experiment"
+    cd "/home/$username/demo-project" 2>/dev/null || cd "/home/$username/data-analysis" 2>/dev/null || cd "/home/$username/ml-experiment"
     
     echo "Current project directory: $(pwd)"
     echo "Project files:"
