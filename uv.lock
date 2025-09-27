@@ -1719,6 +1719,7 @@ dev = [
     { name = "debugpy" },
     { name = "ipdb" },
     { name = "ipython" },
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -1747,6 +1748,7 @@ dev = [
     { name = "debugpy", specifier = ">=1.8.17" },
     { name = "ipdb", specifier = ">=0.13.13" },
     { name = "ipython", specifier = ">=9.5.0" },
+    { name = "pytest", specifier = ">=8.4.2" },
 ]
 
 [[package]]

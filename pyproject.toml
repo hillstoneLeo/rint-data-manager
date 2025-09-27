@@ -32,4 +32,5 @@ dev = [
     "debugpy>=1.8.17",
     "ipdb>=0.13.13",
     "ipython>=9.5.0",
+    "pytest>=8.4.2",
 ]

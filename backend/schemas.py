@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -14,8 +14,7 @@ class UserResponse(UserBase):
     is_admin: bool
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -49,8 +48,7 @@ class DataItemResponse(DataItemBase):
     created_at: datetime
     user: UserResponse
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DataItemWithLineage(DataItemResponse):
     parent: Optional[DataItemResponse] = None
@@ -80,8 +78,7 @@ class UploadedMetadataResponse(BaseModel):
     username: Optional[str] = None
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MetadataUploadResponse(BaseModel):
     message: str
