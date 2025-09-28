@@ -232,9 +232,18 @@
                                 <strong>Created:</strong> ${new Date(item.created_at).toLocaleDateString()}
                             </p>
                             ${item.description ? `<p class="card-text">${item.description}</p>` : ''}
-                            <button class="btn btn-sm btn-outline-primary" onclick="viewLineage(${item.id})">
-                                View Lineage
-                            </button>
+                            
+                            <div class="d-grid gap-2 mt-3">
+                                <button class="btn btn-primary btn-sm" onclick="downloadDataFile(${item.id})">
+                                    下载数据文件
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="downloadDvcFile(${item.id})">
+                                    下载 DVC 文件
+                                </button>
+                                <button class="btn btn-info btn-sm" onclick="copyDvcString(${item.id})">
+                                    拷贝 DVC 字符串
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -253,6 +262,157 @@
                     option.textContent = item.name;
                     select.appendChild(option);
                 });
+            }
+        }
+
+        async function downloadDataFile(itemId) {
+            try {
+                const response = await fetch(`/api/data/${itemId}/download`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'data_file';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    alert('下载失败: ' + (await response.text()));
+                }
+            } catch (error) {
+                console.error('Error downloading data file:', error);
+                alert('下载失败: ' + error.message);
+            }
+        }
+
+        async function downloadDvcFile(itemId) {
+            try {
+                const response = await fetch(`/api/data/${itemId}/dvc-file`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'data_file.dvc';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    alert('下载失败: ' + (await response.text()));
+                }
+            } catch (error) {
+                console.error('Error downloading DVC file:', error);
+                alert('下载失败: ' + error.message);
+            }
+        }
+
+        async function copyDvcString(itemId) {
+            try {
+                const response = await fetch(`/api/data/${itemId}/dvc-content`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const dvcContent = await response.text();
+                    
+                    // Try to copy to clipboard with fallback
+                    if (navigator.clipboard && window.isSecureContext) {
+                        try {
+                            await navigator.clipboard.writeText(dvcContent);
+                            
+                            // Show success message
+                            const buttons = document.querySelectorAll(`button[onclick*="copyDvcString(${itemId})"]`);
+                            if (buttons.length > 0) {
+                                const button = buttons[0];
+                                const originalText = button.textContent;
+                                button.textContent = '已拷贝!';
+                                button.classList.remove('btn-info');
+                                button.classList.add('btn-success');
+                                
+                                setTimeout(() => {
+                                    button.textContent = originalText;
+                                    button.classList.remove('btn-success');
+                                    button.classList.add('btn-info');
+                                }, 2000);
+                            }
+                        } catch (clipboardError) {
+                            // Fallback: create temporary textarea and copy manually
+                            const textArea = document.createElement('textarea');
+                            textArea.value = dvcContent;
+                            textArea.style.position = 'fixed';
+                            textArea.style.left = '-999999px';
+                            textArea.style.top = '-999999px';
+                            document.body.appendChild(textArea);
+                            textArea.focus();
+                            textArea.select();
+                            
+                            try {
+                                document.execCommand('copy');
+                                
+                                // Show success message
+                                const buttons = document.querySelectorAll(`button[onclick*="copyDvcString(${itemId})"]`);
+                                if (buttons.length > 0) {
+                                    const button = buttons[0];
+                                    const originalText = button.textContent;
+                                    button.textContent = '已拷贝!';
+                                    button.classList.remove('btn-info');
+                                    button.classList.add('btn-success');
+                                    
+                                    setTimeout(() => {
+                                        button.textContent = originalText;
+                                        button.classList.remove('btn-success');
+                                        button.classList.add('btn-info');
+                                    }, 2000);
+                                }
+                            } catch (fallbackError) {
+                                alert('拷贝失败: 请手动复制内容');
+                                console.error('Fallback copy failed:', fallbackError);
+                            } finally {
+                                document.body.removeChild(textArea);
+                            }
+                        }
+                    } else {
+                        // Fallback for browsers without clipboard API
+                        const textArea = document.createElement('textarea');
+                        textArea.value = dvcContent;
+                        textArea.style.position = 'fixed';
+                        textArea.style.left = '-999999px';
+                        textArea.style.top = '-999999px';
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        
+                        try {
+                            document.execCommand('copy');
+                            alert('DVC内容已复制到剪贴板');
+                        } catch (fallbackError) {
+                            alert('拷贝失败: 请手动复制内容');
+                            console.error('Manual copy failed:', fallbackError);
+                        } finally {
+                            document.body.removeChild(textArea);
+                        }
+                    }
+                } else {
+                    alert('拷贝失败: ' + (await response.text()));
+                }
+            } catch (error) {
+                console.error('Error copying DVC string:', error);
+                alert('拷贝失败: ' + error.message);
             }
         }
 

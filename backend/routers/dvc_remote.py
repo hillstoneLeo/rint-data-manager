@@ -88,26 +88,32 @@ def extract_original_filename_from_dvc_file(
 
 def extract_metadata_from_db(file_hash: str, db: Session) -> dict:
     """Extract metadata from uploaded_metadata table by file hash"""
-    metadata = {'is_directory': False, 'file_size': None, 'file_count': None, 'original_filename': None}
-    
+    metadata = {
+        'is_directory': False,
+        'file_size': None,
+        'file_count': None,
+        'original_filename': None
+    }
+
     try:
         # Query the uploaded_metadata table for this file hash
         from ..database import UploadedMetadata
-        uploaded_meta = db.query(UploadedMetadata).filter(UploadedMetadata.file_hash == file_hash).first()
-        
+        uploaded_meta = db.query(UploadedMetadata).filter(
+            UploadedMetadata.file_hash == file_hash).first()
+
         if uploaded_meta:
             metadata['original_filename'] = uploaded_meta.original_filename
-            
+
             # Check if this is a directory by looking for .dir extension in the hash
             if file_hash.endswith('.dir'):
                 metadata['is_directory'] = True
             else:
                 metadata['is_directory'] = False
-                
+
     except Exception:
         # If we can't query the database, use defaults
         pass
-        
+
     return metadata
 
 
