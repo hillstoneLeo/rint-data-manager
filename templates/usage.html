@@ -14,7 +14,7 @@
             <div class="navbar-nav ms-auto" id="navbarNav">
                 <a class="nav-link active" href="/usage">使用说明</a>
                 {% if current_user %}
-                    <a class="nav-link" href="/dashboard">数据仓库</a>
+                    <a class="nav-link" href="/">数据仓库</a>
                     {% if current_user.is_admin %}
                         <a class="nav-link" href="/admin">Admin Panel</a>
                     {% endif %}

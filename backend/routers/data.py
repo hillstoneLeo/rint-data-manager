@@ -60,6 +60,18 @@ def list_data_items(
     else:
         return get_all_data_items(db, skip, limit)
 
+@router.get("/public", response_model=List[DataItemResponse])
+def list_public_data_items(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Public endpoint that doesn't require authentication"""
+    # Ensure tables exist before proceeding
+    ensure_tables_exist()
+    
+    return get_all_data_items(db, skip, limit)
+
 @router.get("/{item_id}", response_model=DataItemWithLineage)
 def get_data_item(
     item_id: int,

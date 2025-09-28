@@ -13,17 +13,22 @@
             <a class="navbar-brand" href="/">RINT 数据分享平台</a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="/usage">使用说明</a>
-                {% if current_user.is_admin %}
-                    <a class="nav-link" href="/admin">Admin Panel</a>
+                {% if current_user %}
+                    {% if current_user.is_admin %}
+                        <a class="nav-link" href="/admin">Admin Panel</a>
+                    {% endif %}
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span id="currentUserEmail">{{ current_user.email }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="#" onclick="logout()">Logout</a></li>
+                        </ul>
+                    </div>
+                {% else %}
+                    <a class="nav-link" href="/login">Login</a>
+                    <a class="nav-link" href="/register">Register</a>
                 {% endif %}
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span id="currentUserEmail">{{ current_user.email }}</span>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                        <li><a class="dropdown-item" href="#" onclick="logout()">Logout</a></li>
-                    </ul>
-                </div>
             </div>
         </div>
     </nav>
@@ -34,15 +39,19 @@
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2 id="pageTitle">数据仓库</h2>
                     <div class="d-flex align-items-center">
+                        {% if current_user %}
                         <div class="form-check me-3">
                             <input class="form-check-input" type="checkbox" id="myDataCheckbox" checked>
                             <label class="form-check-label" for="myDataCheckbox">
                                 只显示我的数据
                             </label>
                         </div>
+                        {% endif %}
+                        {% if current_user %}
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
                             Upload Data
                         </button>
+                        {% endif %}
                     </div>
                 </div>
                 
@@ -148,21 +157,35 @@
                     currentUser = await response.json();
                     // User info is already displayed via server-side rendering
                 } else {
-                    window.location.href = '/login';
+                    // If token is invalid, clear it and continue as unauthenticated
+                    localStorage.removeItem('token');
+                    document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+                    currentUser = null;
                 }
             } catch (error) {
                 console.error('Error loading current user:', error);
-                window.location.href = '/login';
+                // If there's an error, continue as unauthenticated
+                currentUser = null;
             }
         }
 
         async function loadDataItems() {
             try {
-                const userOnly = document.getElementById('myDataCheckbox').checked;
-                const response = await fetch(`/api/data/?user_only=${userOnly}`, {
-                    headers: {
+                // Determine if we should filter by user
+                const userOnly = document.getElementById('myDataCheckbox') && document.getElementById('myDataCheckbox').checked;
+                const isAuthenticated = currentUser !== null;
+                
+                let url;
+                if (isAuthenticated) {
+                    url = `/api/data/?user_only=${userOnly}`;
+                } else {
+                    url = '/api/data/public';
+                }
+                
+                const response = await fetch(url, {
+                    headers: authToken ? {
                         'Authorization': `Bearer ${authToken}`
-                    }
+                    } : {}
                 });
                 
                 if (response.ok) {
@@ -221,14 +244,16 @@
 
         function updateParentOptions(dataItems) {
             const select = document.getElementById('parentItem');
-            select.innerHTML = '<option value="">None</option>';
-            
-            dataItems.forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.id;
-                option.textContent = item.name;
-                select.appendChild(option);
-            });
+            if (select) {
+                select.innerHTML = '<option value="">None</option>';
+                
+                dataItems.forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.textContent = item.name;
+                    select.appendChild(option);
+                });
+            }
         }
 
         async function viewLineage(itemId) {
@@ -278,7 +303,11 @@
 
         function updatePageTitle(userOnly) {
             const titleElement = document.getElementById('pageTitle');
-            titleElement.textContent = userOnly ? '我的数据' : '数据仓库';
+            if (currentUser) {
+                titleElement.textContent = userOnly ? '我的数据' : '数据仓库';
+            } else {
+                titleElement.textContent = '数据仓库';
+            }
         }
 
         function formatFileSize(bytes) {
@@ -413,7 +442,9 @@
                 
                 // Send request
                 xhr.open('POST', '/api/data/upload');
-                xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+                if (authToken) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+                }
                 xhr.send(formData);
                 
                 statusText.textContent = `Preparing to upload ${files.length} file${files.length > 1 ? 's' : ''}...`;
@@ -425,11 +456,21 @@
             }
         });
 
-        document.getElementById('myDataCheckbox').addEventListener('change', loadDataItems);
-
+        // Initialize the page
         loadCurrentUser().then(() => {
+            // Set checkbox default state based on authentication
+            const myDataCheckbox = document.getElementById('myDataCheckbox');
+            if (myDataCheckbox) {
+                myDataCheckbox.checked = currentUser !== null; // Checked if user is logged in
+            }
             loadDataItems();
         });
+
+        // Add event listener for checkbox only if it exists
+        const myDataCheckbox = document.getElementById('myDataCheckbox');
+        if (myDataCheckbox) {
+            myDataCheckbox.addEventListener('change', loadDataItems);
+        }
     </script>
 </body>
 </html>

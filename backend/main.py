@@ -37,7 +37,8 @@ def startup_event():
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user_for_template(request, db)
-    return templates.TemplateResponse("index.html", {"request": request, "current_user": current_user})
+    print(f"Current user in root: {current_user}")
+    return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": current_user})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, db: Session = Depends(get_db)):
