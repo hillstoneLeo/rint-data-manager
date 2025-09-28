@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from .database import get_db, User
@@ -50,7 +50,7 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
+        email: Optional[str] = payload.get("sub")
         if email is None:
             raise credentials_exception
     except JWTError:
@@ -65,9 +65,48 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     return current_user
 
 async def get_current_admin_user(current_user: User = Depends(get_current_active_user)):
-    if not current_user.is_admin:
+    if not getattr(current_user, 'is_admin', False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
         )
     return current_user
+
+def get_user_from_token(token: str, db: Session) -> Optional[User]:
+    """Get user from JWT token for server-side rendering"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: Optional[str] = payload.get("sub")
+        if email is None:
+            return None
+    except JWTError:
+        return None
+    
+    user = db.query(User).filter(User.email == email).first()
+    return user
+
+def get_current_user_for_template(request: Request, db: Session) -> Optional[User]:
+    """Get current user from request for template rendering"""
+    # Debug: print cookies
+    print(f"Request cookies: {request.cookies}")
+    
+    # Try to get token from Authorization header
+    auth_header = request.headers.get("Authorization")
+    print(f"Authorization header: {auth_header}")
+    
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]  # Remove "Bearer " prefix
+        user = get_user_from_token(token, db)
+        if user:
+            return user
+    
+    # Try to get token from cookies
+    token = request.cookies.get("access_token")
+    print(f"Token from cookie: {token}")
+    
+    if token:
+        user = get_user_from_token(token, db)
+        if user:
+            return user
+    
+    return None

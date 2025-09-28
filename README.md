@@ -1,4 +1,4 @@
-# RINT Data Manager
+# RINT Data Sharing Platform
 
 A DVC-based platform for data collection and sharing with naive lineage tracking visualization.
 
@@ -14,38 +14,46 @@ A DVC-based platform for data collection and sharing with naive lineage tracking
 - **SQLite Database**: User data and metadata storage
 - **REST API**: Full backend API for all operations
 
-## Quick Start
+## Usage
+
+### Setup Server
+
+Run the following commands on server host:
 
 1. **Install dependencies**:
    ```bash
    uv sync
    ```
 
-2. **Create DVC storage directory**:
+1. **Create DVC storage directory**:
     ```bash
     sudo mkdir /opt/dvc_storage
     sudo chown $USER:$USER /opt/dvc_storage
     mkdir /opt/dvc_storage/uploads  # defined in config.yml
-    cd /opt/dvc_storage/uploads
-    git init
-    dvc init
     
     # Setup DVC remote storage structure
     python setup_dvc_storage.py
     ```
 
-3. **Review and update configuration**:
+1. **Review and update configuration**:
    ```bash
    # Edit config.yml to customize settings as needed
    vi config.yml
    ```
 
-4. **Run the application**:
-    ```bash
-    uv run main.py
-    ```
+1. Start up server: `uv run main.py`
 
-5. **Access the application**:
+### Client Setup: Admin
+
+1. Install DVC client in system level:
+    * Ubuntu: `sudo snap install --classic dvc`
+    * Windows: download binary and install it as administrator
+
+1. Install Git hooks in system level: update git template in systme level 
+
+### Client Usage: Users
+
+1. **Access the application**:
     - Open http://localhost:8000 in your browser
     - Register a new account
     - Upload data files with lineage information
@@ -421,18 +429,3 @@ The application uses `config.yml` for centralized configuration management. All 
 - **Format**: Standard logging format
 - **File**: `app.log`
 
-### Benefits of Centralized Configuration
-
-- **Easy Customization**: All settings in one file
-- **Environment-Specific Settings**: Different configs for dev/prod
-- **No Hardcoded Values**: All configuration values are externalized
-- **Version Control Friendly**: Config can be committed or excluded as needed
-- **Runtime Changes**: Configuration can be changed without code modifications
-
-## Development Notes
-
-- Import errors in IDE are expected (virtual environment not activated in current shell)
-- Application runs correctly when executed with proper Python environment
-- DVC operations are handled automatically during file upload
-- Lineage tracking is implemented as requested with naive parent-child relationships
-- Ready for production deployment with proper secret key configuration

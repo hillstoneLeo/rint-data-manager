@@ -3,17 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RINT Data Manager</title>
+    <title>RINT 数据分享平台</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/style.css" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="/">RINT Data Manager</a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/login">Login</a>
-                <a class="nav-link" href="/register">Register</a>
+            <a class="navbar-brand" href="/">RINT 数据分享平台</a>
+            <div class="navbar-nav ms-auto" id="navbarNav">
+                <a class="nav-link" href="/usage">使用说明</a>
+                {% if current_user %}
+                    <a class="nav-link" href="/dashboard">数据仓库</a>
+                    {% if current_user.is_admin %}
+                        <a class="nav-link" href="/admin">Admin Panel</a>
+                    {% endif %}
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span id="currentUserEmail">{{ current_user.email }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="#" onclick="logout()">Logout</a></li>
+                        </ul>
+                    </div>
+                {% else %}
+                    <a class="nav-link" href="/login">Login</a>
+                    <a class="nav-link" href="/register">Register</a>
+                {% endif %}
             </div>
         </div>
     </nav>
@@ -21,11 +37,14 @@
     <div class="container mt-5">
         <div class="row">
             <div class="col-md-8 mx-auto text-center">
-                <h1 class="display-4">Welcome to RINT Data Manager</h1>
+                <h1 class="display-4">RINT 数据分享平台</h1>
                 <p class="lead">A DVC-based platform for data collection and sharing</p>
                 <div class="mt-4">
-                    <a href="/register" class="btn btn-primary btn-lg me-3">Get Started</a>
-                    <a href="/login" class="btn btn-outline-primary btn-lg">Login</a>
+                    <a href="/usage" class="btn btn-primary btn-lg me-3">使用说明</a>
+                    {% if not current_user %}
+                        <a href="/login" class="btn btn-outline-primary btn-lg" id="loginBtn">Login</a>
+                        <a href="/register" class="btn btn-outline-primary btn-lg" id="registerBtn">Register</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -60,26 +79,10 @@
 
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Check if user is already authenticated
-        const authToken = localStorage.getItem('token');
-        if (authToken) {
-            // Verify token is valid by checking current user
-            fetch('/api/auth/me', {
-                headers: {
-                    'Authorization': `Bearer ${authToken}`
-                }
-            })
-            .then(response => {
-                if (response.ok) {
-                    // User is authenticated, redirect to dashboard
-                    window.location.href = '/dashboard';
-                }
-            })
-            .catch(() => {
-                // Token is invalid, remove it and stay on index page
-                localStorage.removeItem('token');
-            });
+        function logout() {
+            localStorage.removeItem('token');
+            // Clear the cookie as well
+            document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict';
+            window.location.reload();
         }
     </script>
-</body>
-</html>

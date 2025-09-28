@@ -3,17 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - RINT Data Manager</title>
+    <title>Dashboard - RINT 数据分享平台</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/style.css" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="/">RINT Data Manager</a>
+            <a class="navbar-brand" href="/">RINT 数据分享平台</a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="#" id="adminLink" style="display: none;">Admin Panel</a>
-                <a class="nav-link" href="#" onclick="logout()">Logout</a>
+                <a class="nav-link" href="/usage">使用说明</a>
+                {% if current_user.is_admin %}
+                    <a class="nav-link" href="/admin">Admin Panel</a>
+                {% endif %}
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span id="currentUserEmail">{{ current_user.email }}</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li><a class="dropdown-item" href="#" onclick="logout()">Logout</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
@@ -22,12 +32,12 @@
         <div class="row">
             <div class="col-md-12">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 id="pageTitle">My Data Items</h2>
+                    <h2 id="pageTitle">数据仓库</h2>
                     <div class="d-flex align-items-center">
                         <div class="form-check me-3">
                             <input class="form-check-input" type="checkbox" id="myDataCheckbox" checked>
                             <label class="form-check-label" for="myDataCheckbox">
-                                My data only
+                                只显示我的数据
                             </label>
                         </div>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
@@ -136,10 +146,7 @@
                 
                 if (response.ok) {
                     currentUser = await response.json();
-                    if (currentUser.is_admin) {
-                        document.getElementById('adminLink').style.display = 'block';
-                        document.getElementById('adminLink').href = '/admin';
-                    }
+                    // User info is already displayed via server-side rendering
                 } else {
                     window.location.href = '/login';
                 }
@@ -271,7 +278,7 @@
 
         function updatePageTitle(userOnly) {
             const titleElement = document.getElementById('pageTitle');
-            titleElement.textContent = userOnly ? 'My Data Items' : 'All Data Items';
+            titleElement.textContent = userOnly ? '我的数据' : '数据仓库';
         }
 
         function formatFileSize(bytes) {
@@ -284,6 +291,8 @@
 
         function logout() {
             localStorage.removeItem('token');
+            // Clear the cookie as well
+            document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict';
             window.location.href = '/login';
         }
 

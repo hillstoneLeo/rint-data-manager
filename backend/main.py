@@ -1,12 +1,14 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from .database import create_tables
+from sqlalchemy.orm import Session
+from .database import create_tables, get_db
 from .routers import auth, data, admin
 from .routers.log import router as log_router
 from .routers.dvc_remote import router as dvc_remote_router
+from .auth import get_current_user_for_template
 from .config import config
 
 app = FastAPI(title="RINT Data Manager", version="0.1.0")
@@ -33,28 +35,40 @@ def startup_event():
     create_tables()
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def read_root(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_for_template(request, db)
+    return templates.TemplateResponse("index.html", {"request": request, "current_user": current_user})
 
 @app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+async def login_page(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_for_template(request, db)
+    return templates.TemplateResponse("login.html", {"request": request, "current_user": current_user})
 
 @app.get("/register", response_class=HTMLResponse)
-async def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+async def register_page(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_for_template(request, db)
+    return templates.TemplateResponse("register.html", {"request": request, "current_user": current_user})
 
 @app.get("/register-admin", response_class=HTMLResponse)
-async def register_admin_page(request: Request):
-    return templates.TemplateResponse("register-admin.html", {"request": request})
+async def register_admin_page(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_for_template(request, db)
+    return templates.TemplateResponse("register-admin.html", {"request": request, "current_user": current_user})
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+async def dashboard_page(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_for_template(request, db)
+    print(f"Current user in dashboard: {current_user}")
+    return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": current_user})
 
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request):
-    return templates.TemplateResponse("admin.html", {"request": request})
+async def admin_page(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_for_template(request, db)
+    return templates.TemplateResponse("admin.html", {"request": request, "current_user": current_user})
+
+@app.get("/usage", response_class=HTMLResponse)
+async def usage_page(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_for_template(request, db)
+    return templates.TemplateResponse("usage.html", {"request": request, "current_user": current_user})
 
 if __name__ == "__main__":
     import uvicorn
