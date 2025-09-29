@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import timedelta
 import re
 from ..database import get_db, User, ensure_tables_exist
 from ..schemas import UserCreate, UserLogin, Token, UserResponse
-from ..auth import authenticate_user, create_access_token, get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_active_user
+from ..auth import authenticate_user, create_access_token, get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_active_user, get_current_user_for_template
 from ..config import config
 
 router = APIRouter()
@@ -98,4 +98,18 @@ def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 def get_current_user_info(
         current_user: User = Depends(get_current_active_user)):
+    return current_user
+
+
+@router.get("/me-server", response_model=UserResponse)
+def get_current_user_info_server_side(
+        request: Request,
+        db: Session = Depends(get_db)):
+    """Get current user info using server-side authentication (cookies/headers)"""
+    current_user = get_current_user_for_template(request, db)
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
     return current_user

@@ -42,41 +42,13 @@
                 <div class="mt-4">
                     <a href="/usage" class="btn btn-primary btn-lg me-3">使用说明</a>
                     {% if not current_user %}
-                        <a href="/login" class="btn btn-outline-primary btn-lg" id="loginBtn">Login</a>
-                        <a href="/register" class="btn btn-outline-primary btn-lg" id="registerBtn">Register</a>
+                        <a href="/login" class="btn btn-outline-primary btn-lg" id="loginBtn">登录</a>
+                        <a href="/register" class="btn btn-outline-primary btn-lg" id="registerBtn">注册</a>
                     {% endif %}
                 </div>
             </div>
         </div>
         
-        <div class="row mt-5">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Data Upload</h5>
-                        <p class="card-text">Upload files and folders with metadata tracking</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">DVC Integration</h5>
-                        <p class="card-text">Seamless integration with DVC for version control</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Lineage Tracking</h5>
-                        <p class="card-text">Track data relationships and lineage visually</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
         function logout() {

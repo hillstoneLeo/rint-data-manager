@@ -41,7 +41,7 @@
                     <div class="d-flex align-items-center">
                         {% if current_user %}
                         <div class="form-check me-3">
-                            <input class="form-check-input" type="checkbox" id="myDataCheckbox" checked>
+                            <input class="form-check-input" type="checkbox" id="myDataCheckbox">
                             <label class="form-check-label" for="myDataCheckbox">
                                 只显示我的数据
                             </label>
@@ -49,12 +49,22 @@
                         {% endif %}
                         {% if current_user %}
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                            Upload Data
+                            上传数据
                         </button>
                         {% endif %}
                     </div>
                 </div>
                 
+                <!-- Login message will be inserted here by JavaScript -->
+                <div id="loginMessageContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data items moved to the end of the page -->
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
                 <div id="dataItemsList" class="row">
                     <!-- Data items will be loaded here -->
                 </div>
@@ -140,26 +150,38 @@
     <script>
         let authToken = localStorage.getItem('token');
         let currentUser = null;
-        
-        if (!authToken) {
-            window.location.href = '/login';
-        }
 
         async function loadCurrentUser() {
             try {
-                const response = await fetch('/api/auth/me', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
+                // Try server-side authentication first if no token
+                if (!authToken) {
+                    const serverResponse = await fetch('/api/auth/me-server');
+                    if (serverResponse.ok) {
+                        currentUser = await serverResponse.json();
+                        return;
                     }
+                }
+                
+                // Fall back to token-based authentication
+                const response = await fetch('/api/auth/me', {
+                    headers: authToken ? {
+                        'Authorization': `Bearer ${authToken}`
+                    } : {}
                 });
                 
                 if (response.ok) {
                     currentUser = await response.json();
-                    // User info is already displayed via server-side rendering
+                    // Store the token if we got a successful response without one
+                    if (!authToken && response.headers.get('Authorization')) {
+                        authToken = response.headers.get('Authorization').replace('Bearer ', '');
+                        localStorage.setItem('token', authToken);
+                    }
                 } else {
                     // If token is invalid, clear it and continue as unauthenticated
-                    localStorage.removeItem('token');
-                    document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+                    if (authToken) {
+                        localStorage.removeItem('token');
+                        document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+                    }
                     currentUser = null;
                 }
             } catch (error) {
@@ -233,6 +255,7 @@
                             </p>
                             ${item.description ? `<p class="card-text">${item.description}</p>` : ''}
                             
+                            ${currentUser ? `
                             <div class="d-grid gap-2 mt-3">
                                 <button class="btn btn-primary btn-sm" onclick="downloadDataFile(${item.id})">
                                     下载数据文件
@@ -244,11 +267,31 @@
                                     拷贝 DVC 字符串
                                 </button>
                             </div>
+                            ` : ''}
                         </div>
                     </div>
                 `;
                 container.appendChild(card);
             });
+            
+            // Show/hide login message based on authentication state
+            updateLoginMessage();
+        }
+
+        function updateLoginMessage() {
+            const messageContainer = document.getElementById('loginMessageContainer');
+            messageContainer.innerHTML = '';
+            
+            // Add login message if user is not authenticated
+            if (!currentUser) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'alert alert-info text-center';
+                messageDiv.innerHTML = `
+                    <h5>目前处于浏览模式</h5>
+                    <p class="mb-0">请 <a href="/login" class="alert-link">登录</a> 或 <a href="/register" class="alert-link">注册</a> 以上传和下载数据文件</p>
+                `;
+                messageContainer.appendChild(messageDiv);
+            }
         }
 
         function updateParentOptions(dataItems) {
@@ -268,9 +311,9 @@
         async function downloadDataFile(itemId) {
             try {
                 const response = await fetch(`/api/data/${itemId}/download`, {
-                    headers: {
+                    headers: authToken ? {
                         'Authorization': `Bearer ${authToken}`
-                    }
+                    } : {}
                 });
                 
                 if (response.ok) {
@@ -295,9 +338,9 @@
         async function downloadDvcFile(itemId) {
             try {
                 const response = await fetch(`/api/data/${itemId}/dvc-file`, {
-                    headers: {
+                    headers: authToken ? {
                         'Authorization': `Bearer ${authToken}`
-                    }
+                    } : {}
                 });
                 
                 if (response.ok) {
@@ -322,9 +365,9 @@
         async function copyDvcString(itemId) {
             try {
                 const response = await fetch(`/api/data/${itemId}/dvc-content`, {
-                    headers: {
+                    headers: authToken ? {
                         'Authorization': `Bearer ${authToken}`
-                    }
+                    } : {}
                 });
                 
                 if (response.ok) {
@@ -419,9 +462,9 @@
         async function viewLineage(itemId) {
             try {
                 const response = await fetch(`/api/data/${itemId}`, {
-                    headers: {
+                    headers: authToken ? {
                         'Authorization': `Bearer ${authToken}`
-                    }
+                    } : {}
                 });
                 
                 if (response.ok) {
@@ -482,7 +525,7 @@
             localStorage.removeItem('token');
             // Clear the cookie as well
             document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict';
-            window.location.href = '/login';
+            window.location.href = '/';
         }
 
         // Handle upload type selection
@@ -621,7 +664,7 @@
             // Set checkbox default state based on authentication
             const myDataCheckbox = document.getElementById('myDataCheckbox');
             if (myDataCheckbox) {
-                myDataCheckbox.checked = currentUser !== null; // Checked if user is logged in
+                myDataCheckbox.checked = false; // Always unchecked by default
             }
             loadDataItems();
         });
