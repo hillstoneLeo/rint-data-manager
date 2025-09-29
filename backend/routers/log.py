@@ -1,16 +1,36 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import logging
+import logging.handlers
+from pathlib import Path
 from datetime import datetime
+from ..config import config
 
 router = APIRouter()
 
-# Configure logging
+# Setup logging configuration for bootstrap errors
+logging_config = config.logging
+log_file = 'log/bootstrap_errors.log'
+log_level = logging_config.get('level', 'INFO')
+log_format = logging_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Ensure log directory exists
+log_path = Path(log_file)
+if log_path.suffix:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+else:
+    log_path.mkdir(parents=True, exist_ok=True)
+
+# Configure logging for bootstrap errors
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=getattr(logging, log_level.upper(), logging.INFO),
+    format=log_format,
     handlers=[
-        logging.FileHandler('bootstrap_errors.log'),
+        logging.handlers.RotatingFileHandler(
+            log_file,
+            maxBytes=200 * 1024 * 1024,  # 200MB
+            backupCount=5
+        ),
         logging.StreamHandler()
     ])
 

@@ -33,6 +33,7 @@ class DataItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
+    project = Column(String, nullable=True)
     source = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     hash = Column(String, nullable=True)

@@ -55,6 +55,7 @@ rint_data_manager.db
 # Logs
 *.log
 logs/
+log/
 
 # Testing
 .pytest_cache/

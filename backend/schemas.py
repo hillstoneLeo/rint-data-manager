@@ -36,6 +36,7 @@ class Token(BaseModel):
 
 class DataItemBase(BaseModel):
     description: Optional[str] = None
+    project: Optional[str] = None
     source: str
     parent_id: Optional[int] = None
 
