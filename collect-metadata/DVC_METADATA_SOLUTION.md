@@ -1,6 +1,6 @@
 # DVC Metadata Upload Solution
 
-This solution enables the server to capture original filenames when users run `dvc push` from remote hosts, solving the problem where DVC-pushed files only have hash-based names.
+Enables the server to capture original filenames when users run `dvc push` from remote hosts.
 
 ## Problem
 
@@ -9,103 +9,51 @@ When users run `dvc push` to this HTTP server:
 - `.dvc` metadata files (containing original filenames) stay on the client
 - Server has no way to get the original filename
 
-## Solution Overview
+## Solution
 
-1. **New API Endpoint**: `/upload-metadata` to accept `.dvc` file uploads
+1. **API Endpoint**: `/upload-metadata` to accept `.dvc` file uploads
 2. **Database Schema**: Added `original_filename` column to `data_items` table
 3. **Git Hooks**: Automatically upload `.dvc` files after git events
-4. **Migration Script**: Update existing databases
+4. **Fabric Method**: System-wide hook installation
 
 ## Implementation
 
-### 1. Backend Changes
+### Backend Changes
+- Added `upload_metadata` endpoint in `backend/routers/data.py`
+- Added `original_filename` column to `DataItem` model in `backend/database.py`
+- Updated response schema in `backend/schemas.py`
 
-#### Added `upload_metadata` endpoint (`backend/routers/data.py`)
-```python
-@router.post("/upload-metadata")
-async def upload_dvc_metadata(
-    dvc_file: UploadFile = File(...),
-    user_id: int = Form(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
+### Git Hooks
+- `post-commit`: Uploads all `.dvc` files after commit
+- `pre-push`: Uploads only `.dvc` files being pushed
+- Both check for DVC installation and exit gracefully if not found
+
+### Fabric Method
+```bash
+# Install system-wide git templates
+uv run fab -r ./collect-metadata -H <dvc-client-ip> install-git-template  # for example:
+uv run fab -r ./collect-metadata -H 10.160.43.66 install-git-template
 ```
 
-**Features:**
-- Parses `.dvc` YAML files to extract original filename
-- Creates or updates `DataItem` records with original filename
-- Handles both new uploads and existing data items
-
-#### Database Schema Update (`backend/database.py`)
-```python
-class DataItem(Base):
-    # ... existing fields ...
-    original_filename = Column(String, nullable=True)  # NEW
-```
-
-#### Schema Update (`backend/schemas.py`)
-```python
-class DataItemResponse(DataItemBase):
-    # ... existing fields ...
-    original_filename: Optional[str] = None  # NEW
-```
-
-### 2. Git Hooks
-
-#### Recommended: `post-commit` hook
-**Location:** `.git/hooks/post-commit`
-
-**Why `post-commit`?**
-- Runs after `.dvc` files are committed to git
-- Ensures `.dvc` files are finalized and ready
-- Captures both new and modified `.dvc` files
-- Integrates naturally with DVC workflow
-
-**Features:**
-- Scans repository for all `.dvc` files
-- Uploads each `.dvc` file to the server
-- Uses DVC user identity when available, falls back to system user
-- Configurable server URL
-- No authentication required
-
-#### Alternative: `pre-push` hook
-**Location:** `.git/hooks/pre-push`
-
-**Features:**
-- Only uploads `.dvc` files that are being pushed
-- More efficient for large repositories
-- Can block push if upload fails
-- Uses DVC user identity for better tracking
-
-### 3. Installation Scripts
-
-#### `install-dvc-hooks.sh`
-Automated installation script that:
-- Creates git hooks in the correct location
-- Makes hooks executable
-- Provides configuration instructions
+The `install-git_template` task:
+- Reads server URL from `config.yml`
+- Installs hooks as system-wide git templates
+- Configures git to use system template directory
+- Requires sudo access for system-wide installation
 
 ## Usage
 
-### 1. Install Git Hooks
+### Install Git Hooks
 ```bash
+# System-wide installation (recommended)
+fab install-git-template
+
+# Or manual installation
 ./install-dvc-hooks.sh
 ```
 
-### 2. Configure Hooks
-Edit the hook scripts to set:
-- `SERVER_URL`: Your server endpoint
-- DVC user is automatically extracted from `dvc config core.user`
-- System user is used as fallback if DVC user is not configured
-
-### 4. User Workflow
-
-#### For users uploading via web interface:
-- No changes needed - works as before
-
-#### For users using `dvc push` from remote hosts:
+### User Workflow
 ```bash
-# User workflow remains the same
 dvc add my_data.csv
 git add my_data.csv.dvc
 git commit -m "Add data file"
@@ -113,9 +61,9 @@ git commit -m "Add data file"
 dvc push
 ```
 
-## API Endpoint Details
+## API Endpoint
 
-### `POST /api/v1/data/upload-metadata`
+### `POST /api/data/upload-metadata`
 
 **Request:**
 ```http
@@ -134,78 +82,20 @@ username=dvc_user_name
 }
 ```
 
-**Error Responses:**
-- `400 Bad Request`: Invalid `.dvc` file format
-- `500 Internal Server Error`: Failed to process metadata
-
 ## Benefits
 
-1. **Preserves Original Filenames**: Server now displays original names instead of hashes
+1. **Preserves Original Filenames**: Server displays original names instead of hashes
 2. **Seamless Integration**: Users don't need to change their workflow
 3. **Automatic**: Git hooks handle metadata upload automatically
-4. **Backward Compatible**: Existing uploads continue to work
-5. **Flexible**: Supports both `post-commit` and `pre-push` hooks
-6. **Better User Tracking**: Uses DVC user identity for more meaningful metadata
+4. **System-wide**: Fabric method enables organization-wide deployment
+5. **Backward Compatible**: Existing uploads continue to work
 
 ## Files Modified
 
 - `backend/database.py`: Added `original_filename` column
 - `backend/schemas.py`: Added `original_filename` to response schema
 - `backend/routers/data.py`: Added `upload_metadata` endpoint
-- `.git/hooks/post-commit`: Git hook for automatic upload
-- `.git/hooks/pre-push`: Alternative git hook
-- `install-dvc-hooks.sh`: Installation script
-
-## Testing
-
-1. **Test API Endpoint:**
-```bash
-curl -X POST http://localhost:8000/api/data/upload-metadata \
-     -F "dvc_file=@test.dvc" \
-     -F "username=dvc_user_name"
-```
-
-2. **Test Git Hook:**
-```bash
-# Configure DVC user (optional)
-dvc config core.user "your_dvc_username"
-
-# Create a test .dvc file
-echo "outs:
-- md5: test123
-  path: original_name.csv" > test.dvc
-
-# Commit to trigger hook
-git add test.dvc
-git commit -m "Test hook"
-```
-
-3. **Verify Database:**
-```bash
-usql -c 'select name, original_filename from data_items;' rint_data_manager.db
-```
-
-## Troubleshooting
-
-### Hook Not Running
-- Ensure hook is executable: `chmod +x .git/hooks/post-commit`
-- Check git hook directory exists
-- Verify hook script has correct shebang
-
-### Upload Failing
-- Check server URL in hook configuration
-- Verify server is running
-- Check DVC user configuration: `dvc config core.user`
-- Test endpoint manually with curl
-
-### Database Issues
-- Check database file permissions
-- Verify table structure
-
-## Future Enhancements
-
-1. **Bulk Upload**: Support uploading multiple `.dvc` files at once
-2. **User Mapping**: Automatic user detection based on git config
-3. **Webhook Support**: Receive notifications from DVC directly
-4. **Metadata API**: Endpoint to query and manage metadata
-5. **Validation**: Enhanced `.dvc` file validation and error handling
+- `collect-metadata/post-commit`: Git hook for automatic upload
+- `collect-metadata/pre-push`: Alternative git hook
+- `collect-metadata/fabfile.py`: Fabric task for system-wide installation
+- `collect-metadata/install-dvc-hooks.sh`: Manual installation script

@@ -44,96 +44,56 @@
                         <h3>系统概述</h3>
                     </div>
                     <div class="card-body">
-                        <p>RINT 数据分享平台是一个基于 DVC (Data Version Control) 的数据收集和分享平台。用户可以通过两种主要方式上传和管理数据：</p>
+                        <p>RINT 数据分享平台将下面两种模式整合在了一起：</p>
                         <ul>
-                            <li><strong>Web 页面上传</strong>：通过浏览器界面直接上传文件和文件夹</li>
-                            <li><strong>Git + DVC 命令行</strong>：通过 git commit 和 dvc push 命令上传数据</li>
+                            <li><strong>通过 Web 页面手工管理的数据文件</strong>：通过浏览器界面进行数据上传和下载</li>
+                            <li><strong>Git + DVC 管理的数据文件</strong>：通过 DVC 命令行（或 VS Code 插件）进行数据版本控制和同步</li>
                         </ul>
-                    </div>
-                </div>
-
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h3>方法一：通过 Web 页面上传</h3>
-                    </div>
-                    <div class="card-body">
-                        <h4>步骤 1：注册和登录</h4>
+                        
+                        <h4>准备工作</h4>
                         <ol>
-                            <li>访问平台主页，点击 "Register" 创建账户</li>
-                            <li>使用邮箱和密码登录系统</li>
-                            <li>登录后自动跳转到数据仓库页面</li>
-                        </ol>
-
-                        <h4>步骤 2：上传数据</h4>
-                        <ol>
-                            <li>在数据仓库页面，点击 "Upload Data" 按钮</li>
-                            <li>选择上传类型：
-                                <ul>
-                                    <li><strong>Files</strong>：上传一个或多个文件</li>
-                                    <li><strong>Folder</strong>：上传整个文件夹</li>
-                                </ul>
+                            <li>Web 页面通道：注册并登录账户</li>
+                            <li>DVC 通道：配置 DVC 远程存储
+                              <pre><code>
+dvc remote add <remote-name> http://...
+dvc remote modify <remote-name> auth basic
+dvc remote modify <remote-name> user <my-username>
+dvc remote modify <remote-name> password <my-password></code></pre>
                             </li>
-                            <li>选择要上传的文件或文件夹</li>
-                            <li>填写数据源信息（必填），例如数据文件的原始下载链接</li>
-                            <li>添加数据描述（可选）</li>
-                            <li>选择父数据项（可选，用于建立数据关系）</li>
-                            <li>点击 "Upload" 开始上传</li>
                         </ol>
-
-                        <h4>步骤 3：管理数据</h4>
-                        <ul>
-                            <li>查看已上传的数据项列表</li>
-                            <li>使用 "只显示我的数据" 筛选个人数据</li>
-                        </ul>
                     </div>
                 </div>
 
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h3>方法二：通过 Git Commit + DVC Push 上传</h3>
+                        <h3>Web 页面通道</h3>
                     </div>
                     <div class="card-body">
-                        <h4>前提条件</h4>
-                        <ul>
-                            <li>已安装 Git</li>
-                            <li>已安装 DVC</li>
-                            <li>拥有平台的 Git 仓库访问权限</li>
-                        </ul>
+                        <p>登录系统后，在数据仓库页面按照提示上传/下载数据（包括文件和文件夹）。</p>
+                    </div>
+                </div>
 
-                        <h4>步骤 1：克隆仓库</h4>
-                        <pre><code>git clone &lt;repository-url&gt;
-cd &lt;repository-name&gt;</code></pre>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3>DVC 通道</h3>
+                    </div>
+                    <div class="card-body">
+                        <h4>下载数据</h4>
+                        <pre><code>git clone &lt;your-project&gt;
+dvc pull</code></pre>
 
-                        <h4>步骤 2：初始化 DVC</h4>
-                        <pre><code>dvc init</code></pre>
+                        <h4>上传数据</h4>
+                        <p>Git + DVC 上传数据工作流：</p>
+                        <pre><code># 添加数据到 DVC
+dvc add &lt;data-file-or-folder&gt;
 
-                        <h4>步骤 3：配置 DVC 远程存储</h4>
-                        <pre><code>dvc remote add -d myremote &lt;dvc-storage-url&gt;</code></pre>
+# 提交更改到 Git
+git add &lt;your-data-file.dvc&gt;
+git commit -m "Add data via DVC"
 
-                        <h4>步骤 4：添加数据到 DVC</h4>
-                        <pre><code># 添加单个文件
-dvc add data/file.csv
-
-# 添加整个文件夹
-dvc add data/dataset/</code></pre>
-
-                        <h4>步骤 5：提交更改到 Git</h4>
-                        <pre><code>git add .
-git commit -m "Add data files via DVC"</code></pre>
-
-                        <h4>步骤 6：推送数据到远程存储</h4>
-                        <pre><code># 推送 DVC 数据
+# 推送数据到远程存储
 dvc push
-
-# 推送 Git 更改
 git push</code></pre>
-
-                        <h4>步骤 7：拉取数据</h4>
-                        <pre><code># 拉取 DVC 数据
-dvc pull
-
-# 拉取 Git 更改
-git pull</code></pre>
                     </div>
                 </div>
 
@@ -142,17 +102,17 @@ git pull</code></pre>
                         <h3>常见问题</h3>
                     </div>
                     <div class="card-body">
-                        <h4>Q: 支持哪些文件格式？</h4>
-                        <p>A: 平台支持所有文件格式，包括 CSV、JSON、图片、视频、文档等。</p>
+                        <h4>Q: 我的系统没安装 DVC？</h4>
+                        <p>A: 通知系统管理员安装 DVC，也可以在用户层级用 pipx, mise 等工具安装 DVC。</p>
 
-                        <h4>Q: 数据上传大小有限制吗？</h4>
-                        <p>A: 单个文件大小限制为 2GB，文件夹上传没有总大小限制，但建议分批上传大型数据集。</p>
+                        <h4>Q: 怎样在代码库里使用别人分享的数据？</h4>
+                        <p>A: 下载这个数据的 .dvc 文件到代码库里，然后 `dvc push`。</p>
 
-                        <h4>Q: 如何分享数据给其他用户？</h4>
-                        <p>A: 所有注册用户都可以查看平台上的数据。如需限制访问，请联系管理员设置权限。</p>
+                        <h4>Q: Winodws 系统可以使用 DVC 吗？</h4>
+                        <p>A: 可以，下载安装包安装即可，目前还没实现 Winodws 上的自动元数据解析，上传数据的名称可能不对，后续版本会提供支持。</p>
 
-                        <h4>Q: DVC 推送失败怎么办？</h4>
-                        <p>A: 检查网络连接，确认 DVC 远程配置正确，验证存储权限。使用 <code>dvc status</code> 查看同步状态。</p>
+                        <h4>Q: 我能手工修改数据项的元数据吗？</h4>
+                        <p>A: 目前还不能，后续版本实现。</p>
                     </div>
                 </div>
             </div>

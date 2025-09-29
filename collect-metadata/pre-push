@@ -4,6 +4,11 @@
 
 set -e
 
+# Check if dvc is installed
+if ! command -v dvc &> /dev/null; then
+    exit 0
+fi
+
 # Configuration
 SERVER_URL="http://localhost:8000/api/data/upload-metadata"
 
