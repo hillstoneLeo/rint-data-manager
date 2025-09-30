@@ -18,7 +18,7 @@ All containers share a common network and DVC storage volume for seamless data m
 
 - Docker and Docker Compose installed
 - At least 4GB of available memory
-- Port 7123 available on host machine
+- Port 8383 available on host machine
 
 ### Setup
 
@@ -36,7 +36,7 @@ All containers share a common network and DVC storage volume for seamless data m
 
 ### Access the Application
 
-- **Web UI**: Open http://localhost:7123 in your browser
+- **Web UI**: Open http://localhost:8383 in your browser
 - **Client A SSH**: `ssh alice@localhost -p 2222` (password: `alice123`)
 - **Client B SSH**: `ssh cindy@localhost -p 2223` (password: `cindy123`)
 
@@ -80,7 +80,7 @@ Register and login with these credentials:
 ## Demo Workflow
 
 ### Step 1: Web Interface Demo
-1. Open http://localhost:7123
+1. Open http://localhost:8383
 2. Register as `alice` with password `alice123`
 3. Login and upload some data files
 4. Explore the dashboard and admin interface
@@ -156,7 +156,7 @@ Register and login with these credentials:
 
 ### Server Container
 - **Image**: Built from `Dockerfile.server`
-- **Port**: 7123 (mapped to host)
+- **Port**: 8383 (mapped to host)
 - **Volumes**: 
   - `server_data`: Upload directory
   - `dvc_storage`: Shared DVC storage
@@ -191,7 +191,7 @@ client_b_data/        # Client B workspace
 └── cindy/            # Cindy's projects (with .dvc files)
 ```
 
-**Note**: DVC uses HTTP remote storage pointing to `http://server:7123/dvc`. This means:
+**Note**: DVC uses HTTP remote storage pointing to `http://server:8383/dvc`. This means:
 - All DVC data is stored and managed by the Rint Data Manager server in `/opt/dvc_storage`
 - User separation is maintained through DVC metadata (.dvc files) in each project
 - No shared storage volume is needed between containers - clients communicate with server via HTTP
@@ -238,7 +238,7 @@ docker-compose logs -f client_b
 - Modify git hooks in `collect-metadata/` directory
 
 ### Troubleshooting
-1. **Port conflicts**: Ensure ports 7123, 2222, and 2223 are available
+1. **Port conflicts**: Ensure ports 8383, 2222, and 2223 are available
 2. **Permission issues**: Check volume permissions if containers fail to start
 3. **Network issues**: Verify all containers are on the same network
 4. **DVC storage**: Ensure shared volume has proper permissions

@@ -10,7 +10,7 @@ if ! command -v dvc &> /dev/null; then
 fi
 
 # Configuration
-SERVER_URL="http://localhost:8000/api/data/upload-metadata"
+SERVER_URL="http://localhost:${SERVER_PORT}/api/data/upload-metadata"
 
 # Get DVC user if available, fallback to system user
 DVC_USER=$(dvc config core.user 2>/dev/null || echo "${USER:-$(whoami)}")

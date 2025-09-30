@@ -2,7 +2,7 @@
 
 server:
   host: "0.0.0.0"
-  port: 7123
+  port: "${SERVER_PORT}"
   debug: true
   reload: true
 
@@ -12,17 +12,17 @@ database:
 
 dvc:
   # Common storage configuration
-  storage_path: "/opt/dvc_storage"
-  
+  storage_path: "/cyberange/data/dvc-storage"
+
   # Internal DVC operations (existing functionality)
   remote_name: "local_storage"
   uploads_dvc_project: "/tmp/rdm/uploads"
-  
+
   # Upload configuration
   upload_directory: "/tmp/rdm/uploads"
   max_file_size: 104857600  # 100MB in bytes
   allowed_extensions: [".csv", ".json", ".txt", ".xlsx", ".parquet", ".h5", ".pkl", ".py", ".ipynb"]
-  
+
   # HTTP remote server (new functionality)
   remote_server:
     enabled: true
@@ -50,7 +50,7 @@ auth:
    email_suffix_regex: ".*@hillstonenet\\.com$|.*@Hillstonenet\\.com$"
 
 cors:
-  allowed_origins: ["http://localhost:7123", "http://127.0.0.1:7123", "http://10.160.43.82:7123"]
+  allowed_origins: ["http://localhost:${SERVER_PORT}", "http://127.0.0.1:${SERVER_PORT}", "http://${SERVER_IP}:${SERVER_PORT}"]
   allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
   allowed_headers: ["*"]
 

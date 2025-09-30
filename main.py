@@ -56,6 +56,6 @@ logger.info(f"Logging initialized - Level: {log_level}, File: {log_file}")
 if __name__ == "__main__":
     uvicorn.run("backend.main:app",
                 host=config.server.get('host', '0.0.0.0'),
-                port=config.server.get('port', 8000),
+                port=int(config.server.get('port', 8000)),
                 reload=config.server.get('reload', True),
                 log_config="uvicorn_log_config.json")

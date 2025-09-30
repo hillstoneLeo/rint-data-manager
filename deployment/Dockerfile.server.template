@@ -29,7 +29,7 @@ RUN uv sync --frozen
 RUN mkdir -p /tmp/rdm/uploads /opt/dvc_storage
 
 # Expose port
-EXPOSE 7123
+EXPOSE ${DOCKER_SERVER_PORT}
 
 # Run the application using the virtual environment
 CMD [".venv/bin/python", "main.py"]

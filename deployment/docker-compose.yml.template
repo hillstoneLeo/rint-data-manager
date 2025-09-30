@@ -1,0 +1,90 @@
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile.server
+      args:
+        HTTP_PROXY: http://${PROXY_IP}:${PROXY_PORT}
+        HTTPS_PROXY: http://${PROXY_IP}:${PROXY_PORT}
+        http_proxy: http://${PROXY_IP}:${PROXY_PORT}
+        https_proxy: http://${PROXY_IP}:${PROXY_PORT}
+    container_name: rint-server
+    ports:
+      - "${DOCKER_SERVER_PORT}:${DOCKER_SERVER_PORT}"
+    volumes:
+      - server_data:/tmp/rdm/uploads
+      - dvc_storage:/opt/dvc_storage
+    networks:
+      - demo-network
+    environment:
+      - DATABASE_URL=sqlite:///rint_data_manager.db
+      - HTTP_PROXY=http://${PROXY_IP}:${PROXY_PORT}
+      - HTTPS_PROXY=http://${PROXY_IP}:${PROXY_PORT}
+      - http_proxy=http://${PROXY_IP}:${PROXY_PORT}
+      - https_proxy=http://${PROXY_IP}:${PROXY_PORT}
+      - NO_PROXY=localhost,127.0.0.1,*.local
+    restart: unless-stopped
+
+  client_a:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile.client
+      args:
+        HTTP_PROXY: http://${PROXY_IP}:${PROXY_PORT}
+        HTTPS_PROXY: http://${PROXY_IP}:${PROXY_PORT}
+        http_proxy: http://${PROXY_IP}:${PROXY_PORT}
+        https_proxy: http://${PROXY_IP}:${PROXY_PORT}
+    container_name: rint-client-a
+    environment:
+      - CONTAINER_NAME=client_a
+      - HTTP_PROXY=http://${PROXY_IP}:${PROXY_PORT}
+      - HTTPS_PROXY=http://${PROXY_IP}:${PROXY_PORT}
+      - http_proxy=http://${PROXY_IP}:${PROXY_PORT}
+      - https_proxy=http://${PROXY_IP}:${PROXY_PORT}
+      - NO_PROXY=localhost,127.0.0.1,*.local
+    volumes:
+      - client_a_data:/home
+    networks:
+      - demo-network
+    depends_on:
+      - server
+    ports:
+      - "${DOCKER_CLIENT_A_SSH_PORT}:22"
+    restart: unless-stopped
+
+  client_b:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile.client
+      args:
+        HTTP_PROXY: http://${PROXY_IP}:${PROXY_PORT}
+        HTTPS_PROXY: http://${PROXY_IP}:${PROXY_PORT}
+        http_proxy: http://${PROXY_IP}:${PROXY_PORT}
+        https_proxy: http://${PROXY_IP}:${PROXY_PORT}
+    container_name: rint-client-b
+    environment:
+      - CONTAINER_NAME=client_b
+      - HTTP_PROXY=http://${PROXY_IP}:${PROXY_PORT}
+      - HTTPS_PROXY=http://${PROXY_IP}:${PROXY_PORT}
+      - http_proxy=http://${PROXY_IP}:${PROXY_PORT}
+      - https_proxy=http://${PROXY_IP}:${PROXY_PORT}
+      - NO_PROXY=localhost,127.0.0.1,*.local
+    volumes:
+      - client_b_data:/home
+    networks:
+      - demo-network
+    depends_on:
+      - server
+    ports:
+      - "${DOCKER_CLIENT_B_SSH_PORT}:22"
+    restart: unless-stopped
+
+volumes:
+  server_data:
+  client_a_data:
+  client_b_data:
+  dvc_storage:
+
+networks:
+  demo-network:
+    driver: bridge
