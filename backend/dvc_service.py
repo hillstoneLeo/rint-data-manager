@@ -95,6 +95,7 @@ async def create_folder_data_item(files: List[UploadFile],
     db_data_item = DataItem(
         name=folder_base_name,
         description=data.description,
+        project=data.project,
         source=data.source,
         file_path=str(folder_path),
         file_size=0,  # Will be updated from DVC file
@@ -183,6 +184,7 @@ async def create_data_item(file: UploadFile, data: DataItemCreate, user: User,
 
     db_data_item = DataItem(name=display_name,
                             description=data.description,
+                            project=data.project,
                             source=data.source,
                             file_path=str(file_path),
                             file_size=file_size,

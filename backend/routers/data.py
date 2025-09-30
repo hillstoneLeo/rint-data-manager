@@ -19,6 +19,7 @@ router = APIRouter()
 async def upload_data(files: List[UploadFile] = File(...),
                       source: str = Form(...),
                       description: Optional[str] = Form(None),
+                      project: Optional[str] = Form(None),
                       parent_id: Optional[int] = Form(None),
                       db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_active_user)):
@@ -27,6 +28,7 @@ async def upload_data(files: List[UploadFile] = File(...),
 
     data_item_data = DataItemCreate(source=source,
                                     description=description,
+                                    project=project,
                                     parent_id=parent_id)
 
     # Check if this is a folder upload (multiple files with path separators)
