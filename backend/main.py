@@ -10,6 +10,7 @@ from .routers.log import router as log_router
 from .routers.dvc_remote import router as dvc_remote_router
 from .auth import get_current_user_for_template
 from .config import config
+import re
 
 app = FastAPI(title="RINT Data Manager", version="0.1.0")
 
@@ -147,9 +148,19 @@ async def admin_page(request: Request, db: Session = Depends(get_db)):
 @app.get("/usage", response_class=HTMLResponse)
 async def usage_page(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user_for_template(request, db)
+    # Extract public server URL from allowed_origins
+    allowed_origins = config.cors.get('allowed_origins', [])
+    server_url = "http://localhost:7123"  # Default fallback
+    
+    for origin in allowed_origins:
+        if not re.match(r'http://(localhost|127\.0\.0\.1)', origin):
+            server_url = origin
+            break
+    
     return templates.TemplateResponse("usage.html", {
         "request": request,
-        "current_user": current_user
+        "current_user": current_user,
+        "server_url": server_url
     })
 
 

@@ -44,23 +44,27 @@
                         <h3>系统概述</h3>
                     </div>
                     <div class="card-body">
-                        <p>RINT 数据分享平台将下面两种模式整合在了一起：</p>
+                        <p>RINT 数据分享平台将下面两种使用和分享数据的方式整合在了一起：</p>
                         <ul>
                             <li><strong>通过 Web 页面手工管理的数据文件</strong>：通过浏览器界面进行数据上传和下载</li>
                             <li><strong>Git + DVC 管理的数据文件</strong>：通过 DVC 命令行（或 VS Code 插件）进行数据版本控制和同步</li>
                         </ul>
                         
                         <h4>准备工作</h4>
-                        <ol>
-                            <li>Web 页面通道：注册并登录账户</li>
-                            <li>DVC 通道：配置 DVC 远程存储
-                              <pre><code>
-dvc remote add <remote-name> http://...
-dvc remote modify <remote-name> auth basic
-dvc remote modify <remote-name> user <my-username>
-dvc remote modify <remote-name> password <my-password></code></pre>
-                            </li>
-                        </ol>
+                        <p>在首页注册并登录账户就可以通过 Web 页面上传、下载数据文件啦。</p>
+                        <p>如果需要在源码项目中使用 DVC 管理数据文件，请创建文件 ~/.config/dvc/config:
+                        <pre><code>[core]
+remote = myremote
+['remote "myremote"']
+    url = {{ server_url }}/dvc
+    auth = basic
+    user = &lt;registered-email&gt;
+    password = &lt;registered-password&gt;
+                              </code></pre>
+其中 &lt;registered-email&gt; 和 &lt;registered-password&gt; 是前面注册的 Email 和密码。
+<p>在 Windows 系统上，这个配置文件的位置为：%LocalAppData%\iterative\dvc\config。</p>
+<p>这里的注册、配置都是一次性工作，不需要为每个项目单独设置。</p>
+                        </p>
                     </div>
                 </div>
 
@@ -102,17 +106,27 @@ git push</code></pre>
                         <h3>常见问题</h3>
                     </div>
                     <div class="card-body">
-                        <h4>Q: 我的系统没安装 DVC？</h4>
-                        <p>A: 通知系统管理员安装 DVC，也可以在用户层级用 pipx, mise 等工具安装 DVC。</p>
-
-                        <h4>Q: 怎样在代码库里使用别人分享的数据？</h4>
-                        <p>A: 下载这个数据的 .dvc 文件到代码库里，然后 `dvc push`。</p>
+                        <h4>Q: 我使用的 Linux 服务器没安装 DVC？</h4>
+                        <p>A: 通知系统管理员安装，也可以在用户级用 pipx, mise 等工具安装 DVC。</p>
 
                         <h4>Q: Winodws 系统可以使用 DVC 吗？</h4>
-                        <p>A: 可以，下载安装包安装即可，目前还没实现 Winodws 上的自动元数据解析，上传数据的名称可能不对，后续版本会提供支持。</p>
+                        <p>A: 可以，下载安装包安装即可。</p>
 
-                        <h4>Q: 我能手工修改数据项的元数据吗？</h4>
-                        <p>A: 目前还不能，后续版本实现。</p>
+                        <h4>Q: 怎样在代码库里使用别人分享的数据？</h4>
+                        <p>A: 最常见的情况是数据对应的 .dvc 文件已经在代码库里，只要 clone 代码库然后执行 `dvc pull`，所有数据就下载到正确的位置上了。
+                        <p>如果要用的数据还没有对应的 .dvc 文件，可以从 Web 页面上下载这个 .dvc 文件到代码库里，然后 `dvc pull`。</p></p>
+
+                        <h4>Q: 收集的数据文件想上传到平台上，用 Web 还是 DVC 方式好？</h4>
+                        <p>A: 推荐使用 Web 界面上传，完整填写各项字段，方便自己和他人使用。
+
+                        <h4>Q: 我能通过 DVC 上传、下载文件，但在 Web 界面显示的文件名不正确。</h4>
+                        <p>A: 通知管理员检查元数据收集模块。</p>
+
+                        <h4>Q: 已上传数据各项特征值还能修改吗？</h4>
+                        <p>A: 目前还不能，后续版本会增加特征编辑功能。</p>
+
+                        <h4>Q: 上传数据窗口里面的 父级项目 一栏是做什么用的？</h4>
+                        <p>A: 这项用来构建数据文件之间的关系，以构建数据谱系图，目前忽略它即可。</p>
                     </div>
                 </div>
             </div>
