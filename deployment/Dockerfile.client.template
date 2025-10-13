@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -6,28 +6,29 @@ RUN apt-get update && apt-get install -y \
     curl \
     sudo \
     openssh-server \
+    build-essential \
+    libgit2-dev \
+    libffi-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv directly from GitHub releases
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+# Copy uv binary from build context
+COPY ../data/uv /usr/local/bin/uv
+RUN chmod +x /usr/local/bin/uv
 
 # Add uv to PATH
-ENV PATH="/root/.local/bin:$PATH"
+ENV PATH="/usr/local/bin:$PATH"
 
 # Install DVC and git
 RUN uv pip install --system dvc[all] && \
-    git config --global user.name "Demo User" && \
-    git config --global user.email "demo@hillstonenet.com" && \
-    git config --global init.defaultBranch master
+    git config --system init.defaultBranch master
 
 # Copy DVC hooks installation script
-COPY collect-metadata/install-dvc-hooks.sh /usr/local/bin/install-dvc-hooks.sh
 COPY collect-metadata/post-commit /usr/local/share/dvc-hooks/post-commit
 COPY collect-metadata/pre-push /usr/local/share/dvc-hooks/pre-push
 
 # Make scripts executable
-RUN chmod +x /usr/local/bin/install-dvc-hooks.sh && \
-    chmod +x /usr/local/share/dvc-hooks/post-commit && \
+RUN chmod +x /usr/local/share/dvc-hooks/post-commit && \
     chmod +x /usr/local/share/dvc-hooks/pre-push
 
 # Create a script to install hooks globally
@@ -101,7 +102,7 @@ EOF
 RUN chmod +x /usr/local/bin/setup-users
 
 # Copy setup demo script
-COPY test/setup-demo.sh /usr/local/bin/setup-demo.sh
+COPY deployment/setup-demo.sh /usr/local/bin/setup-demo.sh
 RUN chmod +x /usr/local/bin/setup-demo.sh
 
 # Create entrypoint script

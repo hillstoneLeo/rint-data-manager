@@ -2,18 +2,18 @@ services:
   server:
     build:
       context: ..
-      dockerfile: test/Dockerfile.server
-      args:
-        HTTP_PROXY: http://${PROXY_IP}:${PROXY_PORT}
-        HTTPS_PROXY: http://${PROXY_IP}:${PROXY_PORT}
-        http_proxy: http://${PROXY_IP}:${PROXY_PORT}
-        https_proxy: http://${PROXY_IP}:${PROXY_PORT}
-    container_name: rint-server
+      dockerfile: ./deployment/Dockerfile.server
+      # args:
+      #   HTTP_PROXY: http://${PROXY_IP}:${PROXY_PORT}
+      #   HTTPS_PROXY: http://${PROXY_IP}:${PROXY_PORT}
+      #   http_proxy: http://${PROXY_IP}:${PROXY_PORT}
+      #   https_proxy: http://${PROXY_IP}:${PROXY_PORT}
+    container_name: rdm-server
     ports:
-      - "${DOCKER_SERVER_PORT}:${DOCKER_SERVER_PORT}"
+      - "${SERVER_PORT}:${SERVER_PORT}"
     volumes:
       - server_data:/tmp/rdm/uploads
-      - dvc_storage:/opt/dvc_storage
+      - ../dvc_storage:/app/dvc_storage
     networks:
       - demo-network
     environment:
@@ -28,13 +28,13 @@ services:
   client_a:
     build:
       context: ..
-      dockerfile: test/Dockerfile.client
+      dockerfile: ./deployment/Dockerfile.client
       args:
         HTTP_PROXY: http://${PROXY_IP}:${PROXY_PORT}
         HTTPS_PROXY: http://${PROXY_IP}:${PROXY_PORT}
         http_proxy: http://${PROXY_IP}:${PROXY_PORT}
         https_proxy: http://${PROXY_IP}:${PROXY_PORT}
-    container_name: rint-client-a
+    container_name: rdm-client-a
     environment:
       - CONTAINER_NAME=client_a
       - HTTP_PROXY=http://${PROXY_IP}:${PROXY_PORT}
@@ -55,13 +55,13 @@ services:
   client_b:
     build:
       context: ..
-      dockerfile: test/Dockerfile.client
+      dockerfile: ./deployment/Dockerfile.client
       args:
         HTTP_PROXY: http://${PROXY_IP}:${PROXY_PORT}
         HTTPS_PROXY: http://${PROXY_IP}:${PROXY_PORT}
         http_proxy: http://${PROXY_IP}:${PROXY_PORT}
         https_proxy: http://${PROXY_IP}:${PROXY_PORT}
-    container_name: rint-client-b
+    container_name: rdm-client-b
     environment:
       - CONTAINER_NAME=client_b
       - HTTP_PROXY=http://${PROXY_IP}:${PROXY_PORT}
@@ -83,7 +83,6 @@ volumes:
   server_data:
   client_a_data:
   client_b_data:
-  dvc_storage:
 
 networks:
   demo-network:

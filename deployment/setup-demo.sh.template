@@ -23,7 +23,7 @@ setup_user_workspace() {
     sudo -u "$username" dvc init
     
     # Configure DVC remote to use HTTP server
-    sudo -u "$username" dvc remote add -d myremote http://server:7123/dvc
+    sudo -u "$username" dvc remote add -d myremote http://server:\${SERVER_PORT:-7123}/dvc
     sudo -u "$username" dvc remote modify myremote auth basic
     sudo -u "$username" dvc remote modify myremote user $username@hillstonenet.com
     sudo -u "$username" dvc remote modify myremote password ${username}123

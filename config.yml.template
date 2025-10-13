@@ -12,7 +12,7 @@ database:
 
 dvc:
   # Common storage configuration
-  storage_path: "/cyberange/data/dvc-storage"
+  storage_path: "dvc_storage"
 
   # Internal DVC operations (existing functionality)
   remote_name: "local_storage"

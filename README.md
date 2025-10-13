@@ -32,7 +32,6 @@ PROXY_IP=10.160.43.82
 PROXY_PORT=7897
 
 # Docker Configuration
-DOCKER_SERVER_PORT=8383
 DOCKER_CLIENT_A_SSH_PORT=2222
 DOCKER_CLIENT_B_SSH_PORT=2223
 ```
@@ -42,13 +41,50 @@ DOCKER_CLIENT_B_SSH_PORT=2223
 ./setup.sh
 ```
 
-### 4. Start Application
-```bash
-# Option 1: Direct run
-uv run main.py
+This will:
+- Generate `config.yml` with unified DVC storage path set to `dvc_storage`
+- Create the `dvc_storage` directory in the project root
+- Generate Docker configuration files with bind mount to `dvc_storage`
 
-# Option 2: Docker containers
-cd deployment && docker-compose up -d
+### 4. Storage Requirements
+
+**Important**: DVC storage is always located in the `dvc_storage` folder within the project directory. 
+
+#### Disk Space Considerations:
+- **Location**: `./dvc_storage` (project root)
+- **Growth**: Storage grows as users upload files through the application
+- **Capacity**: Plan for future growth based on expected usage
+- **Management**: Administrators are responsible for monitoring and managing disk space
+
+#### Deployment Recommendations:
+1. **Deploy on Large Partition**: Ensure the project is deployed on a disk partition with sufficient space (e.g., 10TB+ for production)
+2. **Monitor Usage**: Regularly check disk usage in the `dvc_storage` directory
+3. **Backup Strategy**: Implement regular backups of the `dvc_storage` folder
+4. **Cleanup Policies**: Consider implementing automated cleanup for old/unused files
+
+#### Example Large Storage Setup:
+```bash
+# Deploy to a large storage partition
+sudo mount /dev/sdb1 /mnt/large-storage
+cd /mnt/large-storage
+git clone <repository-url> rint-data-manager
+cd rint-data-manager
+./setup.sh
+```
+
+### 5. Start Application
+
+#### In Python Virtual Environment
+
+```bash
+uv run main.py
+```
+
+#### In Docker containers
+
+```bash
+docker compose -f deployment/docker-compose.yml up [-d]  # or:
+podman-compose -f deployment/docker-compose.yml up [-d]
 ```
 
 ### 5. Access Application
@@ -69,6 +105,38 @@ This project uses a template-based configuration system:
 3. Start services
 
 No manual file editing required!
+
+## Storage Management
+
+### Monitoring Disk Usage
+```bash
+# Check DVC storage size
+du -sh dvc_storage/
+
+# Monitor disk usage
+df -h
+
+# Find large files in DVC storage
+find dvc_storage/ -type f -size +100M -exec ls -lh {} \;
+```
+
+### Backup Strategies
+```bash
+# Backup DVC storage
+tar -czf dvc_storage_backup_$(date +%Y%m%d).tar.gz dvc_storage/
+
+# Sync to remote storage
+rsync -av dvc_storage/ user@backup-server:/backup/dvc_storage/
+```
+
+### Cleanup Operations
+```bash
+# DVC garbage collection (removes unused cache)
+dvc gc -c
+
+# Clean old files (example: files older than 30 days)
+find dvc_storage/ -type f -mtime +30 -delete
+```
 
 ## DVC Remote Server
 
@@ -165,6 +233,7 @@ Track parent-child relationships between data items:
 | `SERVER_PORT` | Server port | 8383 |
 | `PROXY_IP` | Proxy server IP | 10.160.43.82 |
 | `PROXY_PORT` | Proxy server port | 7897 |
-| `DOCKER_SERVER_PORT` | Docker server port | 8383 |
 | `DOCKER_CLIENT_A_SSH_PORT` | Client A SSH port | 2222 |
 | `DOCKER_CLIENT_B_SSH_PORT` | Client B SSH port | 2223 |
+
+**Note**: DVC storage is always located in `./dvc_storage` within the project directory. Ensure the project is deployed on a disk partition with sufficient space for your expected data volume.

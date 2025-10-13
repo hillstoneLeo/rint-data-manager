@@ -82,6 +82,12 @@ htmlcov/
 temp/
 tmp/
 
+# Data directory (contains UV binary)
+data/
+
+# DVC storage directory (bind mount)
+dvc_storage/
+
 # FastAPI specific
 .mypy_cache/
 .dmypy.json
