@@ -4,13 +4,18 @@
 
 set -e
 
+# Function to print timestamped messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
 # Check if dvc is installed
 if ! command -v dvc &> /dev/null; then
     exit 0
 fi
 
 # Configuration
-SERVER_URL="http://localhost:${SERVER_PORT}/api/data/upload-metadata"
+SERVER_URL="http://localhost:8383/api/data/upload-metadata"
 
 # Get DVC user if available, fallback to system user
 DVC_USER=$(dvc config core.user 2>/dev/null || echo "${USER:-$(whoami)}")
@@ -18,12 +23,14 @@ DVC_USER=$(dvc config core.user 2>/dev/null || echo "${USER:-$(whoami)}")
 REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT"
 
+log "Starting DVC metadata upload for user: $DVC_USER"
+
 find . -name "*.dvc" -type f | while read -r dvc_file; do
     if [[ "$dvc_file" == *".git"* ]]; then
         continue
     fi
     
-    echo "Uploading metadata for: $dvc_file"
+    log "Uploading metadata for: $dvc_file"
     
     curl -X POST "$SERVER_URL" \
          -F "dvc_file=@$dvc_file" \
@@ -31,10 +38,10 @@ find . -name "*.dvc" -type f | while read -r dvc_file; do
          --silent --show-error --fail
     
     if [ $? -eq 0 ]; then
-        echo "✓ Successfully uploaded: $dvc_file"
+        log "✓ Successfully uploaded: $dvc_file"
     else
-        echo "✗ Failed to upload: $dvc_file" >&2
+        log "✗ Failed to upload: $dvc_file" >&2
     fi
 done
 
-echo "DVC metadata upload completed."
+log "DVC metadata upload completed."

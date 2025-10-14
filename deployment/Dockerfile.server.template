@@ -23,6 +23,9 @@ ENV UV_NO_PROXY="*"
 
 # Copy project files
 COPY pyproject.toml uv.lock ./
+# Cache-breaking timestamp
+ARG BUILD_TIMESTAMP=0
+RUN echo $BUILD_TIMESTAMP > /tmp/build_timestamp
 COPY backend/ ./backend/
 COPY static/ ./static/
 COPY templates/ ./templates/
@@ -34,10 +37,45 @@ COPY uvicorn_log_config.json ./
 RUN unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY && uv sync --frozen --python /usr/local/bin/python3
 
 # Create necessary directories
-RUN mkdir -p /tmp/rdm/uploads /opt/dvc_storage
+RUN mkdir -p /tmp/rdm/uploads
+
+# Create startup script with timestamp logging
+RUN cat > /entrypoint.sh << 'EOF'
+#!/bin/bash
+# Entrypoint script for server container
+
+set -e
+
+# Function to print timestamped messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+log "Starting Rint Data Manager server..."
+log "Working directory: $(pwd)"
+log "Python version: $(python --version)"
+log "UV version: $(uv --version)"
+
+# Check if required files exist
+if [ ! -f "main.py" ]; then
+    log "Error: main.py not found!"
+    exit 1
+fi
+
+if [ ! -f "uvicorn_log_config.json" ]; then
+    log "Error: uvicorn_log_config.json not found!"
+    exit 1
+fi
+
+log "All required files found. Starting application..."
+exec .venv/bin/python main.py
+EOF
+
+RUN chmod +x /entrypoint.sh
 
 # Expose port
 EXPOSE ${SERVER_PORT}
 
-# Run the application using the virtual environment
-CMD [".venv/bin/python", "main.py"]
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []

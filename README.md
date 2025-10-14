@@ -82,9 +82,16 @@ uv run main.py
 
 #### In Docker containers
 
+Setup demo environment and start containers:
 ```bash
 docker compose -f deployment/docker-compose.yml up [-d]  # or:
 podman-compose -f deployment/docker-compose.yml up [-d]
+```
+
+Clear demo environment:
+```bash
+docker compose -f deployment/docker-compose.yml down --rmi all --volumes --remove-orphans
+sudo rm -rf dvc_storage/
 ```
 
 ### 5. Access Application

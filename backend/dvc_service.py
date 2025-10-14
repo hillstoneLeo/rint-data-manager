@@ -1,20 +1,24 @@
 import os
 import subprocess
-import shutil
 import yaml
+import shutil
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, Dict, Any, List
+
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
-from .database import DataItem, User
-from .schemas import DataItemCreate, DataItemResponse
 from .config import config
+from .database import User, DataItem
+from .schemas import DataItemCreate, DataItemResponse
 
 UPLOAD_DIR = config.dvc_config.get('upload_directory', '/tmp/rdm/uploads')
 DVC_STORAGE_DIR = config.dvc_config.get('storage_path', '/opt/dvc_storage')
 DVC_REMOTE_NAME = config.dvc_config.get('remote_name', 'local_storage')
 DVC_UPLOADS_PROJECT = config.dvc_config.get('uploads_dvc_project',
                                             '/tmp/rdm/uploads')
+
+# Path to DVC binary in virtual environment
+DVC_BINARY = os.path.join(os.path.dirname(__file__), '..', '.venv', 'bin', 'dvc')
 
 
 def ensure_dvc_repo():
@@ -26,20 +30,20 @@ def ensure_dvc_repo():
     if not os.path.exists(os.path.join(DVC_UPLOADS_PROJECT, ".dvc")):
         Path(DVC_UPLOADS_PROJECT).mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "init"], check=True, cwd=DVC_UPLOADS_PROJECT)
-        subprocess.run(["dvc", "init"], check=True, cwd=DVC_UPLOADS_PROJECT)
+        subprocess.run([DVC_BINARY, "init"], check=True, cwd=DVC_UPLOADS_PROJECT)
 
     # Ensure storage directory exists
     if not os.path.exists(DVC_STORAGE_DIR):
         os.makedirs(DVC_STORAGE_DIR, exist_ok=True)
 
     # Check and add remote in uploads DVC project
-    remote_check = subprocess.run(["dvc", "remote", "list"],
+    remote_check = subprocess.run([DVC_BINARY, "remote", "list"],
                                   capture_output=True,
                                   text=True,
                                   cwd=DVC_UPLOADS_PROJECT)
     if DVC_REMOTE_NAME not in remote_check.stdout:
         subprocess.run([
-            "dvc", "remote", "add", "-d", DVC_REMOTE_NAME,
+            DVC_BINARY, "remote", "add", "-d", DVC_REMOTE_NAME,
             os.path.abspath(DVC_STORAGE_DIR)
         ],
                        check=True,
@@ -112,14 +116,14 @@ async def create_folder_data_item(files: List[UploadFile],
         # Run DVC commands from the uploads DVC project directory
         relative_folder_path = os.path.relpath(str(folder_path),
                                                DVC_UPLOADS_PROJECT)
-        subprocess.run(["dvc", "add", relative_folder_path],
-                       check=True,
-                       capture_output=True,
-                       cwd=DVC_UPLOADS_PROJECT)
-        subprocess.run(["dvc", "push"],
-                       check=True,
-                       capture_output=True,
-                       cwd=DVC_UPLOADS_PROJECT)
+        subprocess.run([DVC_BINARY, "add", relative_folder_path],
+                        check=True,
+                        capture_output=True,
+                        cwd=DVC_UPLOADS_PROJECT)
+        subprocess.run([DVC_BINARY, "push"],
+                        check=True,
+                        capture_output=True,
+                        cwd=DVC_UPLOADS_PROJECT)
 
         dvc_file_path = str(folder_path) + ".dvc"
         if os.path.exists(dvc_file_path):
@@ -199,14 +203,14 @@ async def create_data_item(file: UploadFile, data: DataItemCreate, user: User,
         # Run DVC commands from the uploads DVC project directory
         relative_file_path = os.path.relpath(str(file_path),
                                              DVC_UPLOADS_PROJECT)
-        subprocess.run(["dvc", "add", relative_file_path],
-                       check=True,
-                       capture_output=True,
-                       cwd=DVC_UPLOADS_PROJECT)
-        subprocess.run(["dvc", "push"],
-                       check=True,
-                       capture_output=True,
-                       cwd=DVC_UPLOADS_PROJECT)
+        subprocess.run([DVC_BINARY, "add", relative_file_path],
+                        check=True,
+                        capture_output=True,
+                        cwd=DVC_UPLOADS_PROJECT)
+        subprocess.run([DVC_BINARY, "push"],
+                        check=True,
+                        capture_output=True,
+                        cwd=DVC_UPLOADS_PROJECT)
 
         dvc_file_path = str(file_path) + ".dvc"
         if os.path.exists(dvc_file_path):

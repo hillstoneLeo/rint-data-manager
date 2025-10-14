@@ -4,13 +4,18 @@
 
 set -e
 
+# Function to print timestamped messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
 # Check if dvc is installed
 if ! command -v dvc &> /dev/null; then
     exit 0
 fi
 
 # Configuration
-SERVER_URL="http://localhost:${SERVER_PORT}/api/data/upload-metadata"
+SERVER_URL="http://localhost:8383/api/data/upload-metadata"
 
 # Get DVC user if available, fallback to system user
 DVC_USER=$(dvc config core.user 2>/dev/null || echo "${USER:-$(whoami)}")
@@ -21,11 +26,11 @@ while read local_ref local_sha remote_ref remote_sha; do
     dvc_files=$(git diff --name-only "$local_sha" "$remote_sha" 2>/dev/null | grep '\.dvc$' || true)
     
     if [ -n "$dvc_files" ]; then
-        echo "Uploading DVC metadata for pushed files..."
+        log "Uploading DVC metadata for pushed files..."
         
         for dvc_file in $dvc_files; do
             if [ -f "$dvc_file" ]; then
-                echo "Uploading metadata for: $dvc_file"
+                log "Uploading metadata for: $dvc_file"
                 
                 curl -X POST "$SERVER_URL" \
                      -F "dvc_file=@$dvc_file" \
@@ -33,9 +38,9 @@ while read local_ref local_sha remote_ref remote_sha; do
                      --silent --show-error --fail
                 
                 if [ $? -eq 0 ]; then
-                    echo "✓ Successfully uploaded: $dvc_file"
+                    log "✓ Successfully uploaded: $dvc_file"
                 else
-                    echo "✗ Failed to upload: $dvc_file" >&2
+                    log "✗ Failed to upload: $dvc_file" >&2
                     exit 1
                 fi
             fi
@@ -44,4 +49,5 @@ while read local_ref local_sha remote_ref remote_sha; do
 done
 
 # Continue with push
+log "Pre-push DVC metadata check completed"
 exit 0

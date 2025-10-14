@@ -58,4 +58,5 @@ if __name__ == "__main__":
                 host=config.server.get('host', '0.0.0.0'),
                 port=int(config.server.get('port', 8000)),
                 reload=config.server.get('reload', True),
-                log_config="uvicorn_log_config.json")
+                log_config="uvicorn_log_config.json",
+                log_level="info")
