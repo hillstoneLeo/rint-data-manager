@@ -8,9 +8,8 @@ from ..database import User
 from ..dvc_service import create_data_item, create_folder_data_item, get_data_item_with_lineage, get_user_data_items, get_all_data_items
 import yaml
 import os
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 import os
-from fastapi.responses import FileResponse
 
 router = APIRouter()
 
@@ -360,4 +359,4 @@ def get_dvc_content(item_id: int,
                              default_flow_style=False,
                              sort_keys=False)
 
-    return yaml_content
+    return Response(content=yaml_content, media_type='text/plain')

@@ -1,6 +1,0 @@
-[core]
-    remote = local_storage
-[cache]
-    type = copy
-['remote "local_storage"']
-    url = /opt/dvc_storage

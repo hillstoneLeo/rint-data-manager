@@ -101,8 +101,10 @@ def ensure_tables_exist():
     try:
         # Try to query the first user to see if tables exist
         db = SessionLocal()
-        db.query(User).first()
-        db.close()
+        try:
+            db.query(User).first()
+        finally:
+            db.close()
     except Exception:
         # If there's an error, tables likely don't exist, so create them
         create_tables()

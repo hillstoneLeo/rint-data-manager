@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Response, HTTPException, status, Depends, Header
 from fastapi.responses import FileResponse
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import os
 import hashlib
 import base64
@@ -28,7 +28,8 @@ def create_data_item_from_dvc_upload(
         is_directory: bool = False,
         file_size: Optional[int] = None,
         file_count: Optional[int] = None,
-        original_filename: Optional[str] = None) -> DataItem:
+        original_filename: Optional[str] = None,
+        project: Optional[str] = None) -> DataItem:
     """Create a DataItem record from DVC upload"""
 
     # Use original filename if available, otherwise fallback to hash-based name
@@ -48,6 +49,7 @@ def create_data_item_from_dvc_upload(
     # Create DataItem record
     data_item = DataItem(name=name,
                          description=f"Uploaded via DVC push",
+                         project=project,
                          source="DVC Remote",
                          file_path=file_path,
                          hash=file_hash,
@@ -65,9 +67,14 @@ def create_data_item_from_dvc_upload(
     return data_item
 
 
-def extract_original_filename_from_dvc_file(
-        dvc_file_path: Path) -> Optional[str]:
-    """Extract original filename from DVC metadata file"""
+def extract_metadata_from_dvc_file(dvc_file_path: Path) -> Dict[str, Any]:
+    """Extract complete metadata from DVC file including filename, size, and project"""
+    metadata: Dict[str, Any] = {
+        'original_filename': None,
+        'file_size': None,
+        'project': None
+    }
+    
     try:
         if dvc_file_path.exists():
             with open(dvc_file_path, 'r') as f:
@@ -76,23 +83,53 @@ def extract_original_filename_from_dvc_file(
             if dvc_content and 'outs' in dvc_content and len(
                     dvc_content['outs']) > 0:
                 dvc_out = dvc_content['outs'][0]
-                # The 'path' field contains the original filename
+                
+                # Extract original filename
                 original_path = dvc_out.get('path')
                 if original_path:
-                    # Extract just the filename from the path
-                    return Path(original_path).name
+                    metadata['original_filename'] = Path(original_path).name
+                
+                # Extract file size
+                file_size = dvc_out.get('size')
+                if file_size is not None:
+                    metadata['file_size'] = int(file_size)
+                
+                # Extract project name by finding .git directory
+                metadata['project'] = find_project_from_dvc_file(dvc_file_path)
     except Exception:
         pass
-    return None
+    
+    return metadata
 
 
-def extract_metadata_from_db(file_hash: str, db: Session) -> dict:
-    """Extract metadata from uploaded_metadata table by file hash"""
-    metadata = {
+def find_project_from_dvc_file(dvc_file_path: Path) -> Optional[str]:
+    """Find project name by locating .git directory relative to .dvc file"""
+    try:
+        current_dir = dvc_file_path.parent
+        while current_dir != current_dir.parent:  # Stop at root
+            if (current_dir / '.git').exists():
+                return current_dir.name
+            current_dir = current_dir.parent
+    except Exception:
+        pass
+    return "DVC Upload"  # Fallback if no .git found
+
+
+def extract_original_filename_from_dvc_file(
+        dvc_file_path: Path) -> Optional[str]:
+    """Extract original filename from DVC metadata file (legacy function)"""
+    metadata = extract_metadata_from_dvc_file(dvc_file_path)
+    return metadata.get('original_filename')
+
+
+def extract_metadata_from_db_and_dvc(file_hash: str, db: Session) -> Dict[str, Any]:
+    """Extract metadata from uploaded_metadata table and .dvc files by file hash"""
+    metadata: Dict[str, Any] = {
         'is_directory': False,
         'file_size': None,
         'file_count': None,
-        'original_filename': None
+        'original_filename': None,
+        'project': None
     }
 
     try:
@@ -110,8 +147,29 @@ def extract_metadata_from_db(file_hash: str, db: Session) -> dict:
             else:
                 metadata['is_directory'] = False
 
+        # Try to find and parse the .dvc file for additional metadata
+        # Look for .dvc file in the storage area first
+        dvc_file_path = DVC_STORAGE_PATH / f"{file_hash}.dvc"
+        if dvc_file_path.exists():
+            dvc_metadata = extract_metadata_from_dvc_file(dvc_file_path)
+            # Override with .dvc file data if available
+            if dvc_metadata['original_filename']:
+                metadata['original_filename'] = dvc_metadata['original_filename']
+            if dvc_metadata['file_size'] is not None:
+                metadata['file_size'] = dvc_metadata['file_size']
+            if dvc_metadata['project']:
+                metadata['project'] = dvc_metadata['project']
+        else:
+            # If no .dvc file in storage, try to get file size from the actual file
+            actual_file_path = DVC_STORAGE_PATH / "files" / "md5" / file_hash[:2] / file_hash[2:]
+            if actual_file_path.exists():
+                stat = actual_file_path.stat()
+                metadata['file_size'] = stat.st_size
+            # Use default project if we can't determine it
+            metadata['project'] = "DVC Upload"
+
     except Exception:
-        # If we can't query the database, use defaults
+        # If we can't query the database or parse .dvc file, use defaults
         pass
 
     return metadata
@@ -126,8 +184,8 @@ def handle_dvc_upload_data_item_creation(file_path: str, full_path: Path,
         if is_dvc_hash_path(file_path):
             file_hash = extract_hash_from_path(file_path)
 
-            # Extract metadata from database instead of parsing .dvc files
-            metadata = extract_metadata_from_db(file_hash, db)
+            # Extract metadata from database and .dvc files
+            metadata = extract_metadata_from_db_and_dvc(file_hash, db)
             original_filename = metadata.get('original_filename')
 
             # If no metadata found in database, use file stat as fallback
@@ -146,7 +204,8 @@ def handle_dvc_upload_data_item_creation(file_path: str, full_path: Path,
                 is_directory=metadata.get('is_directory', False),
                 file_size=metadata.get('file_size'),
                 file_count=metadata.get('file_count'),
-                original_filename=original_filename)
+                original_filename=original_filename,
+                project=metadata.get('project'))
 
     except Exception as e:
         # Log error but don't fail the upload
@@ -173,40 +232,52 @@ def get_file_path_from_hash(file_hash: str,
     # Use shared storage path for all users (no user isolation)
     storage_path = DVC_STORAGE_PATH
 
-    # DVC stores files as hash files in subdirectories: files/md5/ab/cdef123...
-    file_path = storage_path / "files" / "md5" / file_hash[:2] / file_hash[2:]
-
-    return file_path
+    # Check if file exists in the expected split format first: files/md5/ab/cdef123...
+    split_path = storage_path / "files" / "md5" / file_hash[:2] / file_hash[2:]
+    if split_path.exists():
+        return split_path
+    
+    # If not found, try direct format: files/md5/abcdef123...
+    direct_path = storage_path / "files" / "md5" / file_hash
+    if direct_path.exists():
+        return direct_path
+    
+    # Default to split format for new files
+    return split_path
 
 
 def is_dvc_hash_path(file_path: str) -> bool:
     """Check if path follows DVC's hash pattern"""
-    # DVC hash paths look like: files/md5/ab/cdef123...
+    # DVC hash paths look like: files/md5/ab/cdef123... or files/md5/abcdef123...
     parts = file_path.split('/')
-    if len(parts) >= 4 and parts[0] == 'files':
+    if len(parts) >= 3 and parts[0] == 'files':
         if parts[1] in ['md5', 'sha256']:
-            if len(parts) == 4:  # files/md5/ab/cdef123...
-                return True
+            # Handle both formats: files/md5/ab/cdef123... (4 parts) or files/md5/abcdef123... (3 parts)
+            return True
     return False
 
 
 def extract_hash_from_path(file_path: str) -> str:
-    """Extract full hash from DVC path like: files/md5/3d/c179a06d7ed78aa2b20d16619cebb4.dir"""
+    """Extract full hash from DVC path like: files/md5/3d/c179a06d7ed78aa2b20d16619cebb4.dir or files/md5/3dc179a06d7ed78aa2b20d16619cebb4.dir"""
     parts = file_path.split('/')
-    if len(parts) >= 4:
-        # Combine the hash prefix (parts[2]) and hash suffix (parts[3])
-        hash_prefix = parts[2]  # '3d'
-        hash_suffix = parts[3]  # 'c179a06d7ed78aa2b20d16619cebb4.dir'
-        return hash_prefix + hash_suffix  # '3dc179a06d7ed78aa2b20d16619cebb4.dir'
+    if len(parts) >= 3 and parts[0] == 'files' and parts[1] in ['md5', 'sha256']:
+        if len(parts) == 4:
+            # Format: files/md5/ab/cdef123...
+            hash_prefix = parts[2]  # '3d'
+            hash_suffix = parts[3]  # 'c179a06d7ed78aa2b20d16619cebb4.dir'
+            return hash_prefix + hash_suffix  # '3dc179a06d7ed78aa2b20d16619cebb4.dir'
+        elif len(parts) == 3:
+            # Format: files/md5/abcdef123...
+            return parts[2]  # 'abcdef123...'
     raise ValueError("Invalid DVC hash path format")
 
 
 @router.get("/{file_path:path}")
 async def get_dvc_file(file_path: str,
-                       request: Request,
-                       authorization: Optional[str] = Header(None),
-                       x_dvc_token: Optional[str] = Header(None),
-                       db: Session = Depends(get_db)):
+                        request: Request,
+                        authorization: Optional[str] = Header(None),
+                        x_dvc_token: Optional[str] = Header(None),
+                        db: Session = Depends(get_db)):
     """Serve DVC files for download"""
     # Ensure tables exist before proceeding
     ensure_tables_exist()
@@ -225,10 +296,10 @@ async def get_dvc_file(file_path: str,
                                 detail="Invalid DVC hash path format")
     else:
         # Regular file path - Security: Prevent path traversal
-        safe_path = Path(file_path).resolve()
-        if safe_path.is_absolute() or '..' in str(safe_path):
+        if '..' in file_path or file_path.startswith('/'):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Invalid file path")
+        safe_path = Path(file_path)
 
         # Get user-specific storage path
         if user:
@@ -278,10 +349,10 @@ async def upload_dvc_file(file_path: str,
                                 detail="Invalid DVC hash path format")
     else:
         # Regular file path - Security: Prevent path traversal
-        safe_path = Path(file_path).resolve()
-        if safe_path.is_absolute() or '..' in str(safe_path):
+        if '..' in file_path or file_path.startswith('/'):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Invalid file path")
+        safe_path = Path(file_path)
 
         # Get user-specific storage path
         if user:
@@ -350,11 +421,11 @@ async def head_dvc_file(file_path: str,
                                 detail="Invalid DVC hash path format")
     else:
         # Regular file path - Security: Prevent path traversal
-        safe_path = Path(file_path).resolve()
-        if safe_path.is_absolute() or '..' in str(safe_path):
+        if '..' in file_path or file_path.startswith('/'):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Invalid file path")
-
+        safe_path = Path(file_path)
+        
         # Get user-specific storage path
         if user:
             storage_path = get_user_storage_path(str(user.email))
