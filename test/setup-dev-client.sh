@@ -1,0 +1,145 @@
+#!/bin/bash
+# Enhanced setup script for development client container
+
+set -e
+
+# Function to print timestamped messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+log "Setting up development client container for test_client..."
+
+# Get development server IP from environment
+DEV_SERVER_IP=${DEV_SERVER_IP:-10.160.43.100}
+SERVER_PORT=${SERVER_PORT:-8383}
+
+log "Development server: http://${DEV_SERVER_IP}:${SERVER_PORT}"
+
+# Function to setup DVC for user with dev server
+setup_dvc_for_user() {
+    local username=$1
+    local project_path=$2
+    
+    log "Setting up DVC for user $username in $project_path..."
+    
+    # Check if project exists
+    if [ ! -d "$project_path" ]; then
+        log "Project path $project_path does not exist, skipping DVC setup"
+        return
+    fi
+    
+    cd "$project_path"
+    
+    # Initialize DVC if not already done
+    if [ ! -d ".dvc" ]; then
+        log "Initializing DVC for $username..."
+        sudo -u "$username" dvc init
+        
+        # Configure DVC remote to use development server
+        sudo -u "$username" dvc remote add -d myremote "http://${DEV_SERVER_IP}:${SERVER_PORT}/dvc"
+        sudo -u "$username" dvc remote modify myremote auth basic
+        sudo -u "$username" dvc remote modify myremote user "$username@hillstonenet.com"
+        sudo -u "$username" dvc remote modify myremote password "${username}123"
+        
+        # Add DVC files to Git
+        sudo -u "$username" git add .dvc/config
+        sudo -u "$username" git commit -m "Add DVC configuration for dev server" || true
+        
+        log "✓ DVC initialized and configured for dev server for $username"
+    else
+        log "DVC already initialized for $username, updating remote configuration..."
+        # Update existing DVC remote to point to dev server
+        sudo -u "$username" dvc remote modify myremote url "http://${DEV_SERVER_IP}:${SERVER_PORT}/dvc" || true
+        sudo -u "$username" dvc remote modify myremote user "$username@hillstonenet.com" || true
+        sudo -u "$username" dvc remote modify myremote password "${username}123" || true
+    fi
+}
+
+# Function to update git hooks for dev server
+update_git_hooks() {
+    local username=$1
+    local project_path=$2
+    
+    log "Updating git hooks for $username in $project_path..."
+    
+    if [ ! -d "$project_path/.git/hooks" ]; then
+        log "Git hooks directory not found, skipping hook update"
+        return
+    fi
+    
+    # Update server URL in hooks to use development server
+    sed -i "s|http://server:8383|http://${DEV_SERVER_IP}:${SERVER_PORT}|g" "$project_path/.git/hooks/post-commit" || true
+    sed -i "s|http://server:8383|http://${DEV_SERVER_IP}:${SERVER_PORT}|g" "$project_path/.git/hooks/pre-push" || true
+    
+    log "✓ Git hooks updated for dev server for $username"
+}
+
+# Function to test DVC connection
+test_dvc_connection() {
+    local username=$1
+    local project_path=$2
+    
+    log "Testing DVC connection for $username..."
+    
+    if [ ! -d "$project_path" ]; then
+        log "Project path $project_path does not exist, skipping connection test"
+        return
+    fi
+    
+    cd "$project_path"
+    
+    # Test DVC connection
+    if sudo -u "$username" dvc remote list | grep -q "myremote"; then
+        log "✓ DVC remote configured for $username"
+        
+        # Test connection (this might fail if server is not running, but that's ok)
+        if sudo -u "$username" timeout 10 dvc status >/dev/null 2>&1; then
+            log "✓ DVC connection successful for $username"
+        else
+            log "⚠ DVC connection test failed for $username (server may not be running)"
+        fi
+    else
+        log "⚠ DVC remote not found for $username"
+    fi
+}
+
+# Wait a bit for the container to be fully ready
+sleep 5
+
+# Setup DVC for alice's demo project
+setup_dvc_for_user "alice" "/home/alice/demo-project"
+update_git_hooks "alice" "/home/alice/demo-project"
+test_dvc_connection "alice" "/home/alice/demo-project"
+
+# Setup DVC for bob's data analysis project  
+setup_dvc_for_user "bob" "/home/bob/data-analysis"
+update_git_hooks "bob" "/home/bob/data-analysis"
+test_dvc_connection "bob" "/home/bob/data-analysis"
+
+log ""
+log "Development client setup complete!"
+log ""
+log "Container is ready for testing with development server at: http://${DEV_SERVER_IP}:${SERVER_PORT}"
+log ""
+log "Usage examples:"
+log "  # Attach to container:"
+log "  docker exec -it rdm-test-client bash"
+log ""
+log "  # Switch to alice user and test:"
+log "  su - alice"
+log "  cd demo-project"
+log "  python src/data_generator.py --records 100"
+log "  git add data/customers.csv"
+log "  git commit -m \"Add customer data\""
+log "  dvc push"
+log ""
+log "  # Test with bob:"
+log "  su - bob"
+log "  cd data-analysis"
+log "  # ... similar commands ..."
+log ""
+log "  # Test DVC status:"
+log "  su - alice"
+log "  cd demo-project"
+log "  dvc status"

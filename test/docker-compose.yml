@@ -1,0 +1,22 @@
+services:
+  test_client:
+    build:
+      context: ..
+      dockerfile: ./test/Dockerfile.test-client
+    container_name: rdm-test-client
+    environment:
+      - CONTAINER_NAME=test_client
+      - DEV_SERVER_IP=${DEV_SERVER_IP:-10.160.43.100}
+      - NO_PROXY=localhost,127.0.0.1,*.local,10.160.43.0/24
+      # Remove proxy variables to avoid interfering with dev server access
+    volumes:
+      - test_client_data:/home
+      - ./setup-dev-client.sh:/test/setup-dev-client.sh:ro  # Mount setup script
+      - ./.env:/test/.env:ro  # Mount environment file for reference
+    network_mode: host  # Use host network to access dev server directly
+    restart: unless-stopped
+    stdin_open: true  # Keep STDIN open for interactive sessions
+    tty: true         # Allocate a TTY
+
+volumes:
+  test_client_data:
