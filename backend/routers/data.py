@@ -8,8 +8,15 @@ from ..database import User
 from ..dvc_service import create_data_item, create_folder_data_item, get_data_item_with_lineage, get_user_data_items, get_all_data_items
 import yaml
 import os
+import json
+import zipfile
+import tempfile
+from pathlib import Path
 from fastapi.responses import FileResponse, Response
-import os
+import json
+import zipfile
+import tempfile
+from pathlib import Path
 
 router = APIRouter()
 
@@ -193,6 +200,53 @@ async def upload_metadata(request: Request,
                             detail=f"Failed to process metadata: {str(e)}")
 
 
+def get_dvc_file_path_from_hash(file_hash: str, storage_path: str) -> str:
+    """Get DVC file path from hash"""
+    if len(file_hash) < 2:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Invalid file hash")
+    
+    hash_prefix = file_hash[:2]
+    hash_suffix = file_hash[2:]
+    return os.path.join(storage_path, "files", "md5", hash_prefix, hash_suffix)
+
+
+def read_dir_metadata(dir_file_path: str) -> list:
+    """Read DVC .dir metadata file and return list of files"""
+    try:
+        with open(dir_file_path, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Cannot read folder metadata: {str(e)}")
+
+
+def create_folder_zip(folder_name: str, file_list: list, storage_path: str) -> str:
+    """Create a ZIP file containing all files from the folder"""
+    temp_dir = tempfile.mkdtemp()
+    zip_path = os.path.join(temp_dir, f"{folder_name}.zip")
+    
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for file_info in file_list:
+            file_hash = file_info['md5']
+            rel_path = file_info['relpath']
+            
+            # Get the actual file path from hash
+            try:
+                actual_file_path = get_dvc_file_path_from_hash(file_hash, storage_path)
+                
+                if os.path.exists(actual_file_path):
+                    # Add file to ZIP with its relative path
+                    zipf.write(actual_file_path, rel_path)
+                else:
+                    print(f"Warning: File {rel_path} (hash: {file_hash}) not found in storage")
+            except Exception as e:
+                print(f"Warning: Error processing file {rel_path}: {str(e)}")
+                continue
+    
+    return zip_path
+
+
 @router.get("/{item_id}/download")
 def download_data_file(item_id: int,
                        db: Session = Depends(get_db),
@@ -215,43 +269,71 @@ def download_data_file(item_id: int,
     # Construct DVC storage path using hash
     from ..config import config
     storage_path = config.get_dvc_storage_path()
-    if len(data_item.hash) < 2:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Invalid file hash")
+    
+    # Check if this is a folder
+    if data_item.is_folder and str(data_item.hash).endswith('.dir'):
+        # Handle folder download - create ZIP file
+        dir_file_path = get_dvc_file_path_from_hash(str(data_item.hash), storage_path)
+        
+        if not os.path.exists(dir_file_path):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Folder metadata not found in DVC storage")
+        
+        # Read folder metadata
+        file_list = read_dir_metadata(dir_file_path)
+        
+        # Create ZIP file
+        zip_path = create_folder_zip(str(data_item.name), file_list, storage_path)
+        
+        try:
+            return FileResponse(
+                path=zip_path,
+                filename=f"{str(data_item.name)}.zip",
+                media_type='application/zip'
+            )
+        except Exception as e:
+            # Clean up temp file if something goes wrong
+            import shutil
+            if os.path.exists(zip_path):
+                os.unlink(zip_path)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"Failed to create folder download: {str(e)}")
+    else:
+        # Handle single file download (original logic)
+        if len(str(data_item.hash)) < 2:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Invalid file hash")
 
-    # Build path: /opt/dvc_storage/files/md5/{first_two_chars}/{remaining_hash}
-    hash_prefix = data_item.hash[:2]
-    hash_suffix = data_item.hash[2:]
-    dvc_file_path = os.path.join(storage_path, "files", "md5", hash_prefix,
-                                 hash_suffix)
+        # Build path: /opt/dvc_storage/files/md5/{first_two_chars}/{remaining_hash}
+        dvc_file_path = get_dvc_file_path_from_hash(str(data_item.hash), storage_path)
 
-    # Verify file exists in DVC storage
-    if not os.path.exists(dvc_file_path):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="File not found in DVC storage")
+        # Verify file exists in DVC storage
+        if not os.path.exists(dvc_file_path):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="File not found in DVC storage")
 
-    # Determine media type based on file extension
-    from pathlib import Path
-    file_extension = Path(data_item.name).suffix.lower()
-    media_type = {
-        '.csv': 'text/csv',
-        '.json': 'application/json',
-        '.txt': 'text/plain',
-        '.xlsx':
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        '.parquet': 'application/octet-stream',
-        '.h5': 'application/octet-stream',
-        '.pkl': 'application/octet-stream',
-        '.py': 'text/plain',
-        '.ipynb': 'application/json',
-        '.zip': 'application/zip',
-    }.get(file_extension, 'application/octet-stream')
+        # Determine media type based on file extension
+        from pathlib import Path
+        file_extension = Path(str(data_item.name)).suffix.lower()
+        media_type = {
+            '.csv': 'text/csv',
+            '.json': 'application/json',
+            '.txt': 'text/plain',
+            '.xlsx':
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.parquet': 'application/octet-stream',
+            '.h5': 'application/octet-stream',
+            '.pkl': 'application/octet-stream',
+            '.py': 'text/plain',
+            '.ipynb': 'application/json',
+            '.zip': 'application/zip',
+        }.get(file_extension, 'application/octet-stream')
 
-    # Serve file with original filename from database
-    return FileResponse(
-        path=dvc_file_path,
-        filename=data_item.name,  # Use original name from database
-        media_type=media_type)
+        # Serve file with original filename from database
+        return FileResponse(
+            path=dvc_file_path,
+            filename=str(data_item.name),  # Use original name from database
+            media_type=media_type)
 
 
 @router.get("/{item_id}/dvc-file")

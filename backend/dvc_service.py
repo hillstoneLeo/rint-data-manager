@@ -59,6 +59,58 @@ async def save_upload_file(upload_file: UploadFile, destination: Path):
                             detail=f"Could not save file: {str(e)}")
 
 
+def extract_common_folder_name(files: List[UploadFile]) -> str:
+    """Extract the common folder path from all uploaded files using Strategy 2"""
+    if not files:
+        return 'unknown_folder'
+    
+    # Get all normalized file paths
+    normalized_paths = []
+    for file in files:
+        file_name = file.filename or 'unknown_file'
+        # Normalize path separators and split into components
+        normalized_path = file_name.replace('\\', '/')
+        path_parts = [part for part in normalized_path.split('/') if part]
+        normalized_paths.append(path_parts)
+    
+    # Find the common prefix among all paths
+    if not normalized_paths:
+        return 'unknown_folder'
+    
+    # Start with the first path and find common parts
+    common_parts = normalized_paths[0][:-1]  # Exclude the filename
+    
+    for path_parts in normalized_paths[1:]:
+        # Compare up to the second-to-last part (excluding filename)
+        current_parts = path_parts[:-1]
+        
+        # Find common prefix length
+        common_length = 0
+        max_length = min(len(common_parts), len(current_parts))
+        
+        for i in range(max_length):
+            if common_parts[i] == current_parts[i]:
+                common_length += 1
+            else:
+                break
+        
+        # Truncate common_parts to the common length
+        common_parts = common_parts[:common_length]
+        
+        # If no common parts left, break early
+        if not common_parts:
+            break
+    
+    # If we have common folder parts, join them with underscores
+    if common_parts:
+        return '_'.join(common_parts)
+    else:
+        # No common folder path, fall back to first filename without extension
+        first_file_name = files[0].filename or 'unknown_file'
+        filename = first_file_name.split('/')[-1].split('\\')[-1]
+        return filename.rsplit('.', 1)[0] if '.' in filename else filename
+
+
 async def create_folder_data_item(files: List[UploadFile],
                                   data: DataItemCreate, user: User,
                                   db: Session) -> DataItemResponse:
@@ -67,12 +119,8 @@ async def create_folder_data_item(files: List[UploadFile],
     user_upload_dir = Path(UPLOAD_DIR or '/tmp/rdm/uploads') / str(user.id)
     user_upload_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create a unique folder name for this upload using the first filename
-    first_file_name = files[0].filename or 'unknown_file'
-    # Extract just the filename without path and remove extension
-    folder_base_name = first_file_name.split('/')[-1].split('\\')[-1]
-    folder_base_name = folder_base_name.rsplit(
-        '.', 1)[0] if '.' in folder_base_name else folder_base_name
+    # Extract the common folder path from all uploaded files
+    folder_base_name = extract_common_folder_name(files)
     folder_name = folder_base_name.replace(' ', '_').lower()
     folder_path = user_upload_dir / folder_name
     folder_path.mkdir(parents=True, exist_ok=True)

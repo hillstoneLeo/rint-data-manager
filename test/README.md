@@ -15,6 +15,24 @@ This test client allows you to:
 1. Development server running on `10.160.43.x` network (default: `10.160.43.82:8383`)
 2. Docker and Docker Compose installed
 3. Access to the development network
+4. **sqlite3** installed (required for cleanup script)
+
+### Installing sqlite3
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update && sudo apt-get install sqlite3
+```
+
+**CentOS/RHEL:**
+```bash
+sudo yum install sqlite3
+```
+
+**macOS:**
+```bash
+brew install sqlite3
+```
 
 ## Setup
 
@@ -144,6 +162,8 @@ With basic authentication using:
 
 ## Cleanup
 
+### Quick Cleanup
+
 ```bash
 # Stop and remove container
 docker-compose down
@@ -152,12 +172,37 @@ docker-compose down
 docker volume rm rint-data-manager_test_client_data
 ```
 
+### Full Environment Reset
+
+For a complete clean slate (removes container, image, database data, and file storage except users):
+
+```bash
+# Full cleanup with confirmation
+./cleanup.sh
+
+# Preview what would be deleted
+./cleanup.sh --dry-run
+
+# Full cleanup without confirmation
+./cleanup.sh --force
+```
+
+The cleanup script will:
+- Remove the test client container and Docker image
+- Clean the `test_client_data` volume
+- Delete all records from database tables (`data_items`, `uploaded_metadata`, `upload_logs`)
+- Remove file storage directories (`dvc_storage` and `/tmp/rdm/uploads`)
+- **Preserve the `users` table** so you don't need to re-register
+
+**Note**: The cleanup script requires `sqlite3` to be installed (see Prerequisites above).
+
 ## Development Workflow
 
 1. Make changes to the server code
 2. Restart the development server
 3. Use this test client to verify functionality
 4. Check logs and debug issues
-5. Repeat until features work correctly
+5. Use `./cleanup.sh` to reset the test environment
+6. Repeat until features work correctly
 
 This isolated test environment ensures you can thoroughly test server functionality without affecting production data or configurations.
