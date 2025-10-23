@@ -10,7 +10,7 @@ A DVC-based platform for data collection and sharing with naive lineage tracking
 - **DVC HTTP Remote**: Full DVC remote server with database authentication
 - **Lineage Tracking**: Parent-child relationships between data items with visualization
 - **Web Interface**: Clean, responsive UI for data management
-- **Template-Based Configuration**: Easy deployment across different environments
+- **Environment-Based Configuration**: Runtime configuration with environment variable overrides
 
 ## Quick Start
 
@@ -21,30 +21,37 @@ cd rint-data-manager
 ```
 
 ### 2. Configure Environment
-Edit `.env` file with your settings:
+Copy and edit the environment file:
+```bash
+cp .env.example .env
+# Edit .env with your settings
+```
+
+Key environment variables:
 ```bash
 # Server Configuration
-SERVER_IP=10.160.43.83
-SERVER_PORT=8383
+RINT_SERVER_PORT=8000
+RINT_SERVER_HOST=0.0.0.0
 
-# Proxy Configuration
-PROXY_IP=10.160.43.82
-PROXY_PORT=7897
+# Database Configuration
+RINT_DATABASE_URL=sqlite:///rint_data_manager.db
 
-# Docker Configuration
+# DVC Configuration
+RINT_DVC_STORAGE_PATH=dvc_storage
+
+# Docker/Deployment Configuration
+SERVER_PORT=8000
+SERVER_IP=127.0.0.1
+PROXY_IP=
+PROXY_PORT=
 DOCKER_CLIENT_A_SSH_PORT=2222
 DOCKER_CLIENT_B_SSH_PORT=2223
 ```
 
-### 3. Generate Configuration Files
+### 3. Create Required Directories
 ```bash
-./setup.sh
+mkdir -p dvc_storage log
 ```
-
-This will:
-- Generate `config.yml` with unified DVC storage path set to `dvc_storage`
-- Create the `dvc_storage` directory in the project root
-- Generate Docker configuration files with bind mount to `dvc_storage`
 
 ### 4. Storage Requirements
 
@@ -69,7 +76,9 @@ sudo mount /dev/sdb1 /mnt/large-storage
 cd /mnt/large-storage
 git clone <repository-url> rint-data-manager
 cd rint-data-manager
-./setup.sh
+cp .env.example .env
+# Edit .env with your settings
+mkdir -p dvc_storage log
 ```
 
 ### 5. Start Application
@@ -94,24 +103,31 @@ docker compose -f deployment/docker-compose.yml down --rmi all --volumes --remov
 sudo rm -rf dvc_storage/
 ```
 
-### 5. Access Application
-Open http://localhost:8383 in your browser
+### 4. Access Application
+Open http://localhost:8000 in your browser (or your configured port)
 
 ## Configuration System
 
-This project uses a template-based configuration system:
+This project uses environment-based configuration with runtime overrides:
 
-- **Templates** (version-controlled): `*.template` files
-- **Generated files** (git-ignored): Actual configuration files
-- **Single source**: Only `.env` file needs editing
+- **Base Configuration**: `config.yml` (version-controlled)
+- **Environment Overrides**: `RINT_*` environment variables
+- **Docker Variables**: Standard deployment variables
+
+### Environment Variable Pattern
+
+All configuration values can be overridden using environment variables:
+- Pattern: `RINT_SECTION_KEY` (e.g., `RINT_SERVER_PORT`, `RINT_DATABASE_URL`)
+- Priority: Environment variables > config.yml > defaults
+- Types: Automatic conversion for strings, integers, booleans, lists
 
 ### Moving to New Host
 
 1. Edit `.env` with new IP/port values
-2. Run `./setup.sh` to regenerate all files
+2. Set environment variables as needed
 3. Start services
 
-No manual file editing required!
+No template regeneration required!
 
 ## Storage Management
 
@@ -151,8 +167,8 @@ Full-featured DVC HTTP remote server with database authentication.
 
 ### Setup DVC Remote
 ```bash
-# Add remote
-dvc remote add -d myremote http://server:8383/dvc
+# Add remote (use your configured port)
+dvc remote add -d myremote http://server:8000/dvc
 
 # Configure authentication
 dvc remote modify myremote auth basic
@@ -170,17 +186,19 @@ dvc remote modify myremote password your-password
 
 ```
 rint-data-manager/
-├── .env                    # Environment configuration
-├── setup.sh                # Configuration generator
-├── config.yml.template     # Application config template
-├── main.py                 # Application entry point
-├── backend/               # FastAPI backend
-├── templates/             # HTML templates
-├── static/               # CSS/JS files
-└── deployment/           # Docker configurations
-    ├── docker-compose.yml.template
-    ├── Dockerfile.server.template
-    └── Dockerfile.client.template
+├── .env.example           # Environment variables template
+├── .env                   # Environment configuration (git-ignored)
+├── config.yml             # Application configuration
+├── main.py                # Application entry point
+├── backend/              # FastAPI backend
+├── templates/            # HTML templates
+├── static/              # CSS/JS files
+├── dvc_storage/          # DVC data storage (git-ignored)
+├── log/                  # Application logs (git-ignored)
+└── deployment/          # Docker configurations
+    ├── docker-compose.yml
+    ├── Dockerfile.server
+    └── Dockerfile.client
 ```
 
 ## Technology Stack
@@ -220,12 +238,13 @@ Track parent-child relationships between data items:
 ### Setup Issues
 - Ensure `.env` file exists and is properly formatted
 - Check all required environment variables are set
-- Verify template files exist in repository
+- Verify `config.yml` exists in repository
 
 ### Port Conflicts
 - Ensure specified ports are available on host
 - Check firewall settings
 - Verify no other services use same ports
+- Use `RINT_SERVER_PORT` environment variable to change port
 
 ### Docker Issues
 - Ensure Docker is installed and running
@@ -234,13 +253,25 @@ Track parent-child relationships between data items:
 
 ## Environment Variables
 
+### Application Configuration (RINT_*)
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SERVER_IP` | Server public IP | 10.160.43.83 |
-| `SERVER_PORT` | Server port | 8383 |
-| `PROXY_IP` | Proxy server IP | 10.160.43.82 |
-| `PROXY_PORT` | Proxy server port | 7897 |
+| `RINT_SERVER_HOST` | Server bind address | 0.0.0.0 |
+| `RINT_SERVER_PORT` | Server port | 8000 |
+| `RINT_SERVER_DEBUG` | Enable debug mode | true |
+| `RINT_DATABASE_URL` | Database connection URL | sqlite:///rint_data_manager.db |
+| `RINT_DVC_STORAGE_PATH` | DVC storage directory | dvc_storage |
+| `RINT_AUTH_JWT_SECRET_KEY` | JWT signing secret | your-secret-key-here |
+| `RINT_LOGGING_LEVEL` | Logging level | INFO |
+
+### Docker/Deployment Variables
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_PORT` | Docker exposed port | 8000 |
+| `SERVER_IP` | Server IP for clients | 127.0.0.1 |
+| `PROXY_IP` | Proxy server IP | (empty) |
+| `PROXY_PORT` | Proxy server port | (empty) |
 | `DOCKER_CLIENT_A_SSH_PORT` | Client A SSH port | 2222 |
 | `DOCKER_CLIENT_B_SSH_PORT` | Client B SSH port | 2223 |
 
-**Note**: DVC storage is always located in `./dvc_storage` within the project directory. Ensure the project is deployed on a disk partition with sufficient space for your expected data volume.
+**Note**: See `.env.example` for the complete list of configurable variables. DVC storage is always located in `./dvc_storage` within the project directory. Ensure the project is deployed on a disk partition with sufficient space for your expected data volume.

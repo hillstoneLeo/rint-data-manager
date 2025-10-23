@@ -24,16 +24,11 @@ FILES_ONLY=false
 FORCE=false
 VERBOSE=false
 
-# Template-generated files mapping (relative to project root)
-GENERATED_FILES=(
+# Configuration files (relative to project root)
+# Note: These are no longer template-generated but may be cleaned for full reset
+CONFIG_FILES=(
     "config.yml"
-    "deployment/docker-compose.yml"
-    "deployment/setup-demo.sh"
-    "deployment/demo.sh"
-    "deployment/Dockerfile.server"
-    "deployment/Dockerfile.client"
-    "collect-metadata/pre-push"
-    "collect-metadata/post-commit"
+    ".env"
 )
 
 # Directories to clean (relative to project root)
@@ -83,7 +78,7 @@ USAGE:
 OPTIONS:
     --dry-run, -n       Show what would be deleted without actually deleting
     --docker-only       Only clean Docker resources (containers, images, volumes, networks)
-    --files-only        Only delete generated files and directories
+    --files-only        Only delete configuration files and directories
     --force, -f         Skip confirmation prompts
     --verbose, -v       Show detailed operations
     --help, -h          Show this help message
@@ -92,6 +87,7 @@ EXAMPLES:
     ./deployment/cleanup.sh                    # Full cleanup with confirmation
     ./deployment/cleanup.sh --dry-run          # Preview what would be deleted
     ./deployment/cleanup.sh --docker-only      # Only clean Docker resources
+    ./deployment/cleanup.sh --files-only       # Only clean configuration files
     ./deployment/cleanup.sh --force            # Full cleanup without confirmation
 
 EOF
@@ -166,8 +162,8 @@ confirm_cleanup() {
     fi
     
     if [ "$DOCKER_ONLY" = false ]; then
-        echo "📄 Generated Files:"
-        for file in "${GENERATED_FILES[@]}"; do
+        echo "📄 Configuration Files:"
+        for file in "${CONFIG_FILES[@]}"; do
             if [ -f "$PROJECT_ROOT/$file" ]; then
                 echo "   • $file"
             fi
@@ -257,13 +253,13 @@ cleanup_docker_resources() {
     log "INFO" "✓ Docker resources cleanup complete"
 }
 
-# Cleanup generated files
-cleanup_generated_files() {
-    log "INFO" "Removing generated files..."
+# Cleanup configuration files
+cleanup_config_files() {
+    log "INFO" "Removing configuration files..."
     
     local files_removed=0
     
-    for file in "${GENERATED_FILES[@]}"; do
+    for file in "${CONFIG_FILES[@]}"; do
         local full_path="$PROJECT_ROOT/$file"
         
         if [ -f "$full_path" ]; then
@@ -285,9 +281,9 @@ cleanup_generated_files() {
     done
     
     if [ "$DRY_RUN" = true ]; then
-        log "DRYRUN" "Would remove $files_removed generated files"
+        log "DRYRUN" "Would remove $files_removed configuration files"
     else
-        log "INFO" "✓ Removed $files_removed generated files"
+        log "INFO" "✓ Removed $files_removed configuration files"
     fi
 }
 
@@ -356,7 +352,7 @@ show_summary() {
         log "INFO" "🎉 Cleanup complete!"
         echo ""
         log "INFO" "Next steps:"
-        echo "   1. Run './setup.sh' to regenerate configuration files"
+        echo "   1. Copy '.env.example' to '.env' and configure as needed"
         echo "   2. Run 'docker compose -f deployment/docker-compose.yml up -d' to start services"
         echo ""
     fi
@@ -384,7 +380,7 @@ main() {
     if [ "$DOCKER_ONLY" = true ]; then
         log "INFO" "DOCKER ONLY MODE - Only Docker resources will be cleaned"
     elif [ "$FILES_ONLY" = true ]; then
-        log "INFO" "FILES ONLY MODE - Only generated files and directories will be cleaned"
+        log "INFO" "FILES ONLY MODE - Only configuration files and directories will be cleaned"
     else
         log "INFO" "FULL CLEANUP MODE - All resources will be cleaned"
     fi
@@ -402,7 +398,7 @@ main() {
     fi
     
     if [ "$DOCKER_ONLY" = false ]; then
-        cleanup_generated_files
+        cleanup_config_files
         cleanup_directories
     fi
     
