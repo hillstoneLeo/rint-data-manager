@@ -1,0 +1,17 @@
+[Unit]
+Description=RINT Data Manager Service
+After=network.target
+
+[Service]
+Type=simple
+User=leo
+WorkingDirectory=/cyberange/home/leo/Documents/rint-data-sharing-project/rint-data-manager
+Environment=PATH=/cyberange/home/leo/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/cyberange/home/leo/.local/bin/uv run main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

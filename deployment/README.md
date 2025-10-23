@@ -1,4 +1,8 @@
-# Rint Data Manager - Docker Demo Environment
+# Rint Data Manager - Deployment Options
+
+This document provides multiple deployment options for the Rint Data Manager platform.
+
+## Option 1: Docker Demo Environment
 
 This demo environment showcases the Rint Data Manager platform using Docker containers. It includes a server container running the Rint Data Manager application and two client containers with pre-configured users and DVC setup.
 
@@ -281,3 +285,151 @@ This demo environment uses default credentials for demonstration purposes. In pr
 ## Support
 
 For issues or questions about this demo environment, please refer to the main project documentation or create an issue in the project repository.
+
+---
+
+## Option 2: Systemd Service Deployment
+
+This deployment method runs the Rint Data Manager as a systemd service, providing automatic startup on boot and process restart capabilities.
+
+### Prerequisites
+
+- Python 3.13+ with uv installed
+- systemd (available on most Linux distributions)
+- Appropriate system permissions to create and manage services
+
+### Setup
+
+1. **Copy the service file**:
+   ```bash
+   sudo cp deployment/rint-data-manager.service /etc/systemd/system/
+   ```
+
+2. **Customize the service file** (if needed):
+   Edit `/etc/systemd/system/rint-data-manager.service` to modify:
+   - `User`: Change to the user that should run the service
+   - `WorkingDirectory`: Update to your project path
+   - `Environment`: Adjust PATH if uv is installed elsewhere
+   - `ExecStart`: Modify if using different startup command
+
+3. **Reload systemd and enable the service**:
+   ```bash
+   # Reload systemd to recognize the new service
+   sudo systemctl daemon-reload
+   
+   # Enable the service to start on boot
+   sudo systemctl enable rint-data-manager
+   
+   # Start the service now
+   sudo systemctl start rint-data-manager
+   ```
+
+### Service Management
+
+```bash
+# Check service status
+sudo systemctl status rint-data-manager
+
+# View real-time logs (recommended)
+sudo journalctl -u rint-data-manager -f
+
+# View recent logs (last 100 lines)
+sudo journalctl -u rint-data-manager -n 100
+
+# View logs since service start
+sudo journalctl -u rint-data-manager -b
+
+# View logs with timestamps
+sudo journalctl -u rint-data-manager -o short-iso
+
+# Restart the service
+sudo systemctl restart rint-data-manager
+
+# Stop the service
+sudo systemctl stop rint-data-manager
+
+# Disable automatic startup on boot
+sudo systemctl disable rint-data-manager
+```
+
+### Log Monitoring
+
+**Recommended: Use `journalctl`**
+
+For systemd services, `journalctl` is the recommended way to watch logs:
+
+```bash
+# Follow real-time logs
+sudo journalctl -u rint-data-manager -f
+
+# View logs with specific priority
+sudo journalctl -u rint-data-manager -p err -f  # Errors only
+sudo journalctl -u rint-data-manager -p warning -f  # Warnings and above
+
+# View logs from specific time
+sudo journalctl -u rint-data-manager --since "1 hour ago"
+sudo journalctl -u rint-data-manager --since "2025-01-01" --until "2025-01-02"
+```
+
+**Why `journalctl` over `tail -f ./log/xxx`:**
+
+- **Centralized**: All service logs in one place
+- **Structured**: Proper log levels and metadata
+- **Persistent**: Survives service restarts
+- **Searchable**: Filter by time, priority, etc.
+- **Standard**: Works consistently across all systemd services
+
+**Note**: The service is configured to send both stdout and stderr to the systemd journal. While your application may also write to log files, `journalctl` provides the most reliable and complete view of service activity.
+
+### Service Features
+
+- **Automatic Restart**: The service will automatically restart if the process is killed or crashes
+- **Boot Startup**: Configured to start automatically when the system boots
+- **Logging**: Uses systemd journal for centralized logging
+- **Process Management**: Managed by systemd with proper resource limits
+
+### Configuration
+
+The service file includes these key settings:
+
+- `Type=simple`: Standard service type
+- `Restart=always`: Always restart on failure
+- `RestartSec=10`: Wait 10 seconds before restarting
+- `StandardOutput=journal`: Send output to systemd journal
+- `StandardError=journal`: Send errors to systemd journal
+
+### Troubleshooting
+
+1. **Service fails to start**:
+   ```bash
+   sudo journalctl -u rint-data-manager -n 50
+   ```
+
+2. **Permission issues**:
+   - Ensure the specified user has read/write access to the project directory
+   - Check that uv is accessible in the specified PATH
+
+3. **Port conflicts**:
+   - The service defaults to port 8000 (configurable in your application config)
+   - Ensure the port is not already in use
+
+4. **Environment variables**:
+   - Add any required environment variables to the service file using `Environment=` lines
+
+### Advantages of Systemd Deployment
+
+- **Production Ready**: Suitable for production environments
+- **Resource Management**: systemd handles process limits and resource allocation
+- **Integration**: Integrates well with system monitoring and logging tools
+- **Reliability**: Automatic restart and health monitoring
+- **Performance**: Direct execution without container overhead
+
+### Migration from Docker
+
+If you're migrating from the Docker deployment:
+
+1. Ensure all dependencies are installed on the host system
+2. Copy any configuration files from the Docker container
+3. Update database connection strings if needed
+4. Verify file permissions and paths
+5. Test the service before switching production traffic
