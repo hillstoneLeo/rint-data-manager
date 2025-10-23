@@ -2,12 +2,15 @@ import yaml
 import os
 from pathlib import Path
 from typing import Dict, Any, Union
+from dotenv import load_dotenv
 
 
 class Config:
 
     def __init__(self, config_path: str = "config.yml"):
         self.config_path = config_path
+        # Load .env file if it exists
+        load_dotenv()
         self._config = self._load_config()
 
     def _load_config(self) -> Dict[str, Any]:
