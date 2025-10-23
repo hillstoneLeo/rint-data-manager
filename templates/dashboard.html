@@ -152,6 +152,25 @@
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteConfirmTitle">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="deleteConfirmBody">
+                    确定要删除这个数据项吗？此操作无法撤销。
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteButton">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
         let authToken = localStorage.getItem('token');
@@ -273,6 +292,16 @@
                                 <button class="btn btn-info btn-sm" onclick="copyDvcString(${item.id})">
                                     拷贝 DVC 字符串
                                 </button>
+                                ${item.user.id === currentUser.id ? `
+                                <button class="btn btn-danger btn-sm" onclick="confirmDeleteDataItem(${item.id}, '${item.name.replace(/'/g, "\\'")}')">
+                                    删除
+                                </button>
+                                ` : ''}
+                                ${currentUser.is_admin && item.user.id !== currentUser.id ? `
+                                <button class="btn btn-warning btn-sm" onclick="confirmAdminDeleteDataItem(${item.id}, '${item.name.replace(/'/g, "\\'")}', '${item.user.email}')">
+                                    管理员删除
+                                </button>
+                                ` : ''}
                             </div>
                             ` : ''}
                         </div>
@@ -681,6 +710,115 @@ messageDiv.innerHTML = '<div class="alert alert-danger">网络错误</div>';
         const myDataCheckbox = document.getElementById('myDataCheckbox');
         if (myDataCheckbox) {
             myDataCheckbox.addEventListener('change', loadDataItems);
+        }
+
+        // Delete confirmation functions
+        function confirmDeleteDataItem(itemId, itemName) {
+            const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            document.getElementById('deleteConfirmTitle').textContent = '确认删除';
+            document.getElementById('deleteConfirmBody').textContent = `确定要删除数据项 "${itemName}" 吗？此操作无法撤销。`;
+            
+            const confirmButton = document.getElementById('confirmDeleteButton');
+            confirmButton.textContent = '删除';
+            confirmButton.className = 'btn btn-danger';
+            confirmButton.onclick = () => deleteDataItem(itemId);
+            
+            modal.show();
+        }
+
+        function confirmAdminDeleteDataItem(itemId, itemName, ownerEmail) {
+            const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            document.getElementById('deleteConfirmTitle').textContent = '管理员删除确认';
+            document.getElementById('deleteConfirmBody').textContent = `确定要以管理员身份删除用户 "${ownerEmail}" 的数据项 "${itemName}" 吗？此操作无法撤销。`;
+            
+            const confirmButton = document.getElementById('confirmDeleteButton');
+            confirmButton.textContent = '管理员删除';
+            confirmButton.className = 'btn btn-warning';
+            confirmButton.onclick = () => adminDeleteDataItem(itemId);
+            
+            modal.show();
+        }
+
+        async function deleteDataItem(itemId) {
+            try {
+                const response = await fetch(`/api/data/${itemId}`, {
+                    method: 'DELETE',
+                    headers: authToken ? {
+                        'Authorization': `Bearer ${authToken}`
+                    } : {}
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    // Show success message
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                    messageDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+                    messageDiv.innerHTML = `
+                        ${result.message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(messageDiv);
+                    
+                    // Hide modal and reload data
+                    bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                    loadDataItems();
+                    
+                    // Auto-remove message after 5 seconds
+                    setTimeout(() => {
+                        if (messageDiv.parentNode) {
+                            messageDiv.parentNode.removeChild(messageDiv);
+                        }
+                    }, 5000);
+                } else {
+                    const error = await response.json();
+                    alert('删除失败: ' + (error.detail || '未知错误'));
+                }
+            } catch (error) {
+                console.error('Error deleting data item:', error);
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        async function adminDeleteDataItem(itemId) {
+            try {
+                const response = await fetch(`/api/admin/data/${itemId}`, {
+                    method: 'DELETE',
+                    headers: authToken ? {
+                        'Authorization': `Bearer ${authToken}`
+                    } : {}
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    // Show success message
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                    messageDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+                    messageDiv.innerHTML = `
+                        ${result.message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(messageDiv);
+                    
+                    // Hide modal and reload data
+                    bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                    loadDataItems();
+                    
+                    // Auto-remove message after 5 seconds
+                    setTimeout(() => {
+                        if (messageDiv.parentNode) {
+                            messageDiv.parentNode.removeChild(messageDiv);
+                        }
+                    }, 5000);
+                } else {
+                    const error = await response.json();
+                    alert('删除失败: ' + (error.detail || '未知错误'));
+                }
+            } catch (error) {
+                console.error('Error deleting data item:', error);
+                alert('删除失败: ' + error.message);
+            }
         }
     </script>
 </body>

@@ -109,3 +109,15 @@ class DVCUserInfo(BaseModel):
     email: Optional[str] = None
     is_admin: Optional[bool] = None
     created_at: Optional[datetime] = None
+
+
+class DeleteResponse(BaseModel):
+    message: str
+    item_id: int
+    item_name: str
+
+
+class GCResponse(BaseModel):
+    message: str
+    files_deleted: int
+    space_freed: int  # in bytes

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ..database import get_db, ensure_tables_exist, UploadedMetadata, DataItem
-from ..schemas import DataItemCreate, DataItemResponse, DataItemWithLineage, UploadResponse, UploadedMetadataResponse, MetadataUploadResponse
+from ..schemas import DataItemCreate, DataItemResponse, DataItemWithLineage, UploadResponse, UploadedMetadataResponse, MetadataUploadResponse, DeleteResponse
 from ..auth import get_current_active_user
 from ..database import User
 from ..dvc_service import create_data_item, create_folder_data_item, get_data_item_with_lineage, get_user_data_items, get_all_data_items
@@ -13,10 +13,6 @@ import zipfile
 import tempfile
 from pathlib import Path
 from fastapi.responses import FileResponse, Response
-import json
-import zipfile
-import tempfile
-from pathlib import Path
 
 router = APIRouter()
 
@@ -442,3 +438,35 @@ def get_dvc_content(item_id: int,
                              sort_keys=False)
 
     return Response(content=yaml_content, media_type='text/plain')
+
+
+@router.delete("/{item_id}", response_model=DeleteResponse)
+def delete_data_item(item_id: int,
+                     db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_active_user)):
+    """Delete a data item (only if owned by the current user)"""
+    ensure_tables_exist()
+
+    # Get the data item
+    data_item = db.query(DataItem).filter(DataItem.id == item_id).first()
+    if not data_item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Data item not found")
+
+    # Check if user owns this item
+    if data_item.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="You can only delete your own data items")
+
+    # Store item info for response
+    item_name = str(data_item.name)
+
+    # Delete the data item (this will cascade delete related records)
+    db.delete(data_item)
+    db.commit()
+
+    return DeleteResponse(
+        message=f"Data item '{item_name}' deleted successfully",
+        item_id=item_id,
+        item_name=item_name
+    )
