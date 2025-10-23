@@ -3,9 +3,22 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
+import time
+import logging
 from .config import config
+try:
+    from .utils.timing import timing_logger, log_timing
+except ImportError:
+    # Fallback if utils module is not available
+    def timing_logger(func):
+        return func
+    def log_timing(message, start_time=None):
+        return time.time()
 
 DATABASE_URL = config.database.get('url', 'sqlite:///./rint_data_manager.db')
+
+# Set up logging for timing
+logger = logging.getLogger(__name__)
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -96,15 +109,31 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
 
 
+@timing_logger
 def ensure_tables_exist():
     """Check if tables exist and create them if they don't"""
+    log_timing("ensure_tables_exist - starting table existence check")
+    start_time = log_timing("ensure_tables_exist - creating database session")
+    
     try:
         # Try to query the first user to see if tables exist
         db = SessionLocal()
+        db_time = log_timing("ensure_tables_exist - database session created", start_time)
+        
         try:
+            query_start = log_timing("ensure_tables_exist - executing User.first() query")
             db.query(User).first()
+            log_timing("ensure_tables_exist - User.first() query completed", query_start)
         finally:
+            close_start = log_timing("ensure_tables_exist - closing database session")
             db.close()
-    except Exception:
+            log_timing("ensure_tables_exist - database session closed", close_start)
+            
+        log_timing("ensure_tables_exist - tables exist, total check time", start_time)
+    except Exception as e:
+        log_timing(f"ensure_tables_exist - exception caught: {e}, creating tables")
         # If there's an error, tables likely don't exist, so create them
+        create_start = log_timing("ensure_tables_exist - creating tables")
         create_tables()
+        log_timing("ensure_tables_exist - tables created", create_start)
+        log_timing("ensure_tables_exist - total time with table creation", start_time)

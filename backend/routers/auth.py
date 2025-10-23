@@ -2,10 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import timedelta
 import re
+import time
+import logging
 from ..database import get_db, User, ensure_tables_exist
 from ..schemas import UserCreate, UserLogin, Token, UserResponse
 from ..auth import authenticate_user, create_access_token, get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_active_user, get_current_user_for_template
 from ..config import config
+try:
+    from ..utils.timing import timing_logger, log_timing
+except ImportError:
+    # Fallback if utils module is not available
+    def timing_logger(func):
+        return func
+    def log_timing(message, start_time=None):
+        return time.time()
+
+# Set up logging for timing
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -96,20 +109,30 @@ def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
+@timing_logger
 def get_current_user_info(
         current_user: User = Depends(get_current_active_user)):
+    log_timing("get_current_user_info - starting endpoint")
     return current_user
 
 
 @router.get("/me-server", response_model=UserResponse)
+@timing_logger
 def get_current_user_info_server_side(
         request: Request,
         db: Session = Depends(get_db)):
     """Get current user info using server-side authentication (cookies/headers)"""
+    log_timing("get_current_user_info_server_side - starting endpoint")
+    
+    start_time = log_timing("get_current_user_info_server_side - calling get_current_user_for_template")
     current_user = get_current_user_for_template(request, db)
+    log_timing("get_current_user_info_server_side - get_current_user_for_template completed", start_time)
+    
     if not current_user:
+        log_timing("get_current_user_info_server_side - no user found, raising 401")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated"
         )
+    log_timing("get_current_user_info_server_side - user found, returning response")
     return current_user

@@ -173,33 +173,84 @@
 
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Timing configuration - can be controlled via environment or config
+        const TIMING_DEBUG_ENABLED = true; // Set to true to enable frontend timing debugging
+        
+        // Page load timing
+        if (TIMING_DEBUG_ENABLED) {
+            console.time('page-load-to-script');
+            console.log('TIMING: Script execution started');
+        }
+        
         let authToken = localStorage.getItem('token');
         let currentUser = null;
+        
+        if (TIMING_DEBUG_ENABLED) {
+            console.log('TIMING: Variables initialized, authToken exists:', !!authToken);
+        }
 
         async function loadCurrentUser() {
+            if (TIMING_DEBUG_ENABLED) {
+                console.time('loadCurrentUser');
+                console.log('TIMING: loadCurrentUser - starting');
+            }
+            
             try {
                 // Try server-side authentication first if no token
                 if (!authToken) {
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.time('me-server-fetch');
+                        console.log('TIMING: loadCurrentUser - fetching /api/auth/me-server');
+                    }
                     const serverResponse = await fetch('/api/auth/me-server');
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.timeEnd('me-server-fetch');
+                    }
+                    
                     if (serverResponse.ok) {
+                        if (TIMING_DEBUG_ENABLED) {
+                            console.time('me-server-parse');
+                        }
                         currentUser = await serverResponse.json();
+                        if (TIMING_DEBUG_ENABLED) {
+                            console.timeEnd('me-server-parse');
+                            console.log('TIMING: loadCurrentUser - completed via me-server');
+                            console.timeEnd('loadCurrentUser');
+                        }
                         return;
                     }
                 }
                 
                 // Fall back to token-based authentication
+                if (TIMING_DEBUG_ENABLED) {
+                    console.time('me-fetch');
+                    console.log('TIMING: loadCurrentUser - fetching /api/auth/me');
+                }
                 const response = await fetch('/api/auth/me', {
                     headers: authToken ? {
                         'Authorization': `Bearer ${authToken}`
                     } : {}
                 });
+                if (TIMING_DEBUG_ENABLED) {
+                    console.timeEnd('me-fetch');
+                }
                 
                 if (response.ok) {
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.time('me-parse');
+                    }
                     currentUser = await response.json();
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.timeEnd('me-parse');
+                    }
+                    
                     // Store the token if we got a successful response without one
                     if (!authToken && response.headers.get('Authorization')) {
                         authToken = response.headers.get('Authorization').replace('Bearer ', '');
                         localStorage.setItem('token', authToken);
+                    }
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.log('TIMING: loadCurrentUser - completed via me');
                     }
                 } else {
                     // If token is invalid, clear it and continue as unauthenticated
@@ -208,15 +259,30 @@
                         document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
                     }
                     currentUser = null;
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.log('TIMING: loadCurrentUser - failed authentication');
+                    }
                 }
             } catch (error) {
                 console.error('Error loading current user:', error);
                 // If there's an error, continue as unauthenticated
                 currentUser = null;
+                if (TIMING_DEBUG_ENABLED) {
+                    console.log('TIMING: loadCurrentUser - error occurred');
+                }
+            }
+            
+            if (TIMING_DEBUG_ENABLED) {
+                console.timeEnd('loadCurrentUser');
             }
         }
 
         async function loadDataItems() {
+            if (TIMING_DEBUG_ENABLED) {
+                console.time('loadDataItems');
+                console.log('TIMING: loadDataItems - starting');
+            }
+            
             try {
                 // Determine if we should filter by user
                 const userOnly = document.getElementById('myDataCheckbox') && document.getElementById('myDataCheckbox').checked;
@@ -229,22 +295,57 @@
                     url = '/api/data/public';
                 }
                 
+                if (TIMING_DEBUG_ENABLED) {
+                    console.log(`TIMING: loadDataItems - fetching ${url}`);
+                    console.time('data-fetch');
+                }
                 const response = await fetch(url, {
                     headers: authToken ? {
                         'Authorization': `Bearer ${authToken}`
                     } : {}
                 });
+                if (TIMING_DEBUG_ENABLED) {
+                    console.timeEnd('data-fetch');
+                }
                 
                 if (response.ok) {
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.time('data-parse');
+                    }
                     const dataItems = await response.json();
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.timeEnd('data-parse');
+                        console.log(`TIMING: loadDataItems - got ${dataItems.length} items`);
+                    }
+                    
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.time('display-data');
+                    }
                     displayDataItems(dataItems);
                     updateParentOptions(dataItems);
                     updatePageTitle(userOnly);
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.timeEnd('display-data');
+                    }
+                    
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.log('TIMING: loadDataItems - completed successfully');
+                    }
                 } else {
                     console.error('Failed to load data items');
+                    if (TIMING_DEBUG_ENABLED) {
+                        console.log('TIMING: loadDataItems - failed with status:', response.status);
+                    }
                 }
             } catch (error) {
                 console.error('Error loading data items:', error);
+                if (TIMING_DEBUG_ENABLED) {
+                    console.log('TIMING: loadDataItems - error occurred');
+                }
+            }
+            
+            if (TIMING_DEBUG_ENABLED) {
+                console.timeEnd('loadDataItems');
             }
         }
 
@@ -697,19 +798,51 @@ messageDiv.innerHTML = '<div class="alert alert-danger">网络错误</div>';
         });
 
         // Initialize the page
+        if (TIMING_DEBUG_ENABLED) {
+            console.time('dashboard-initialization');
+            console.log('TIMING: Dashboard initialization starting');
+        }
+        
         loadCurrentUser().then(() => {
+            if (TIMING_DEBUG_ENABLED) {
+                console.log('TIMING: loadCurrentUser completed, starting checkbox setup');
+                console.timeEnd('dashboard-initialization');
+            }
+            
             // Set checkbox default state based on authentication
             const myDataCheckbox = document.getElementById('myDataCheckbox');
             if (myDataCheckbox) {
                 myDataCheckbox.checked = false; // Always unchecked by default
             }
+            
+            if (TIMING_DEBUG_ENABLED) {
+                console.log('TIMING: About to call loadDataItems');
+            }
             loadDataItems();
+        }).catch(error => {
+            console.error('TIMING: Error in dashboard initialization:', error);
+            if (TIMING_DEBUG_ENABLED) {
+                console.timeEnd('dashboard-initialization');
+            }
         });
 
         // Add event listener for checkbox only if it exists
         const myDataCheckbox = document.getElementById('myDataCheckbox');
         if (myDataCheckbox) {
             myDataCheckbox.addEventListener('change', loadDataItems);
+        }
+        
+        // Log when page is fully loaded
+        if (TIMING_DEBUG_ENABLED) {
+            window.addEventListener('load', function() {
+                console.timeEnd('page-load-to-script');
+                console.log('TIMING: Page fully loaded');
+            });
+            
+            // Log DOM ready state
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('TIMING: DOM content loaded');
+            });
         }
 
         // Delete confirmation functions

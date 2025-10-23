@@ -11,8 +11,21 @@ import os
 import json
 import zipfile
 import tempfile
+import time
+import logging
 from pathlib import Path
 from fastapi.responses import FileResponse, Response
+try:
+    from ..utils.timing import timing_logger, log_timing
+except ImportError:
+    # Fallback if utils module is not available
+    def timing_logger(func):
+        return func
+    def log_timing(message, start_time=None):
+        return time.time()
+
+# Set up logging for timing
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -52,18 +65,29 @@ async def upload_data(files: List[UploadFile] = File(...),
 
 
 @router.get("/", response_model=List[DataItemResponse])
+@timing_logger
 def list_data_items(skip: int = 0,
                     limit: int = 100,
                     user_only: bool = True,
                     db: Session = Depends(get_db),
                     current_user: User = Depends(get_current_active_user)):
+    log_timing(f"list_data_items - starting with user_only={user_only}")
+    
     # Ensure tables exist before proceeding
+    start_time = log_timing("list_data_items - calling ensure_tables_exist")
     ensure_tables_exist()
+    log_timing("list_data_items - ensure_tables_exist completed", start_time)
 
     if user_only:
-        return get_user_data_items(db, current_user, skip, limit)
+        query_start = log_timing("list_data_items - calling get_user_data_items")
+        result = get_user_data_items(db, current_user, skip, limit)
+        log_timing("list_data_items - get_user_data_items completed", query_start)
+        return result
     else:
-        return get_all_data_items(db, skip, limit)
+        query_start = log_timing("list_data_items - calling get_all_data_items")
+        result = get_all_data_items(db, skip, limit)
+        log_timing("list_data_items - get_all_data_items completed", query_start)
+        return result
 
 
 @router.get("/public", response_model=List[DataItemResponse])

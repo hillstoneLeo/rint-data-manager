@@ -4,12 +4,25 @@ import yaml
 import shutil
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+import time
+import logging
 
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
 from .config import config
 from .database import User, DataItem
 from .schemas import DataItemCreate, DataItemResponse
+try:
+    from .utils.timing import timing_logger, log_timing
+except ImportError:
+    # Fallback if utils module is not available
+    def timing_logger(func):
+        return func
+    def log_timing(message, start_time=None):
+        return time.time()
+
+# Set up logging for timing
+logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = config.dvc_config.get('upload_directory', '/tmp/rdm/uploads')
 DVC_STORAGE_DIR = config.dvc_config.get('storage_path', '/opt/dvc_storage')
@@ -291,13 +304,23 @@ def get_data_item_with_lineage(db: Session, item_id: int,
                                      DataItem.user_id == user.id).first()
 
 
+@timing_logger
 def get_user_data_items(db: Session,
                         user: User,
                         skip: int = 0,
                         limit: int = 100):
-    return db.query(DataItem).filter(
+    log_timing(f"get_user_data_items - starting query for user {user.id}")
+    start_time = log_timing("get_user_data_items - executing query")
+    result = db.query(DataItem).filter(
         DataItem.user_id == user.id).offset(skip).limit(limit).all()
+    log_timing(f"get_user_data_items - query completed, returned {len(result)} items", start_time)
+    return result
 
 
+@timing_logger
 def get_all_data_items(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(DataItem).offset(skip).limit(limit).all()
+    log_timing("get_all_data_items - starting query")
+    start_time = log_timing("get_all_data_items - executing query")
+    result = db.query(DataItem).offset(skip).limit(limit).all()
+    log_timing(f"get_all_data_items - query completed, returned {len(result)} items", start_time)
+    return result

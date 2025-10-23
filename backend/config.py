@@ -60,6 +60,43 @@ class Config:
     def logging(self) -> Dict[str, Any]:
         return self._config.get('logging', {})
 
+    @property
+    def timing_debug(self) -> Dict[str, Any]:
+        return self._config.get('timing_debug', {})
+
+    def get_timing_debug_enabled(self) -> bool:
+        """Get timing debug enabled setting with environment variable override"""
+        # Priority 1: Environment variable
+        env_value = os.getenv('TIMING_DEBUG_ENABLED')
+        if env_value is not None:
+            return env_value.lower() in ('true', '1', 'yes', 'on')
+        
+        # Priority 2: Config file
+        config_value = self.get('timing_debug.enabled', False)
+        return bool(config_value)
+
+    def get_timing_debug_log_level(self) -> str:
+        """Get timing debug log level with environment variable override"""
+        # Priority 1: Environment variable
+        env_value = os.getenv('TIMING_DEBUG_LOG_LEVEL')
+        if env_value is not None:
+            return str(env_value).upper()
+        
+        # Priority 2: Config file
+        config_value = self.get('timing_debug.log_level', 'INFO')
+        return str(config_value)
+
+    def get_timing_debug_include_frontend(self) -> bool:
+        """Get timing debug include frontend setting with environment variable override"""
+        # Priority 1: Environment variable
+        env_value = os.getenv('TIMING_DEBUG_INCLUDE_FRONTEND')
+        if env_value is not None:
+            return env_value.lower() in ('true', '1', 'yes', 'on')
+        
+        # Priority 2: Config file
+        config_value = self.get('timing_debug.include_frontend', False)
+        return bool(config_value)
+
     def get_dvc_storage_path(self) -> str:
         """Get DVC storage path with backward compatibility"""
         # Try new unified structure first
