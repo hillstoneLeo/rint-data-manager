@@ -1,0 +1,47 @@
+#!/bin/bash
+# DVC Metadata Upload Hook (post-commit version)
+# Uploads .dvc files after committing to git
+
+set -e
+
+# Check if dvc is installed
+if ! command -v dvc &> /dev/null; then
+    exit 0
+fi
+
+# Function to print timestamped messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+# Configuration - use environment variable or default
+SERVER_URL="http://localhost:${SERVER_PORT:-8000}/api/data/upload-metadata"
+
+# Get DVC user if available, fallback to system user
+DVC_USER=$(dvc config core.user 2>/dev/null || echo "${USER:-$(whoami)}")
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+log "Starting DVC metadata upload for user: $DVC_USER"
+
+find . -name "*.dvc" -type f | while read -r dvc_file; do
+    if [[ "$dvc_file" == *".git"* ]]; then
+        continue
+    fi
+    
+    log "Uploading metadata for: $dvc_file"
+    
+    curl -X POST "$SERVER_URL" \
+         -F "dvc_file=@$dvc_file" \
+         -F "username=$DVC_USER" \
+         --silent --show-error --fail
+    
+    if [ $? -eq 0 ]; then
+        log "✓ Successfully uploaded: $dvc_file"
+    else
+        log "✗ Failed to upload: $dvc_file" >&2
+    fi
+done
+
+log "DVC metadata upload completed."

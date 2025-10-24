@@ -45,7 +45,7 @@ def ensure_dvc_repo():
     if not os.path.exists(os.path.join(DVC_UPLOADS_PROJECT, ".dvc")):
         Path(DVC_UPLOADS_PROJECT).mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "init"], check=True, cwd=DVC_UPLOADS_PROJECT)
-        run_dvc_command(["init"], cwd=DVC_UPLOADS_PROJECT)
+        run_dvc_command(["init", "-f", "-q"], cwd=DVC_UPLOADS_PROJECT)
 
     # Ensure storage directory exists
     if not os.path.exists(DVC_STORAGE_DIR):

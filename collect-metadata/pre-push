@@ -1,0 +1,91 @@
+#!/bin/bash
+# DVC Metadata Upload Hook (pre-push version)
+# Uploads .dvc files before pushing to remote
+
+set -e
+
+# Check if dvc is installed
+if ! command -v dvc &> /dev/null; then
+    exit 0
+fi
+
+# Function to print timestamped messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+# Function to derive SERVER_URL from DVC remote
+get_server_url() {
+    # Get default remote name
+    DEFAULT_REMOTE=$(dvc config core.remote 2>/dev/null)
+    
+    if [ -z "$DEFAULT_REMOTE" ]; then
+        log "⚠ No default DVC remote found, using localhost"
+        echo "http://localhost:${SERVER_PORT:-8000}/api/data/upload-metadata"
+        return
+    fi
+    
+    # Get remote URL
+    REMOTE_URL=$(dvc config "remote.$DEFAULT_REMOTE.url" 2>/dev/null)
+    
+    if [ -z "$REMOTE_URL" ]; then
+        log "⚠ No URL found for remote '$DEFAULT_REMOTE', using localhost"
+        echo "http://localhost:${SERVER_PORT:-8000}/api/data/upload-metadata"
+        return
+    fi
+    
+    # Validate format: should end with /dvc
+    if [[ ! "$REMOTE_URL" =~ ^https?://[^/]+/dvc/?$ ]]; then
+        log "✗ Invalid DVC remote format: $REMOTE_URL"
+        log "Expected format: http://<IP>:<port>/dvc"
+        log "Please modify this hook manually or set SERVER_URL environment variable"
+        exit 1
+    fi
+    
+    # Transform /dvc to /api/data/upload-metadata
+    if [[ "$REMOTE_URL" =~ ^(.*)/dvc/?$ ]]; then
+        BASE_URL="${BASH_REMATCH[1]}"
+        echo "${BASE_URL}/api/data/upload-metadata"
+    else
+        log "✗ Failed to parse remote URL: $REMOTE_URL"
+        exit 1
+    fi
+}
+
+# Configuration - derive from DVC remote or use environment variable
+SERVER_URL=$(get_server_url)
+
+# Get DVC user if available, fallback to system user
+DVC_USER=$(dvc config core.user 2>/dev/null || echo "${USER:-$(whoami)}")
+
+# Read stdin to get push details
+while read local_ref local_sha remote_ref remote_sha; do
+    # Find .dvc files that are being pushed
+    dvc_files=$(git diff --name-only "$local_sha" "$remote_sha" 2>/dev/null | grep '\.dvc$' || true)
+    
+    if [ -n "$dvc_files" ]; then
+        log "Uploading DVC metadata for pushed files..."
+        
+        for dvc_file in $dvc_files; do
+            if [ -f "$dvc_file" ]; then
+                log "Uploading metadata for: $dvc_file"
+                
+                curl -X POST "$SERVER_URL" \
+                     -F "dvc_file=@$dvc_file" \
+                     -F "username=$DVC_USER" \
+                     --silent --show-error --fail
+                
+                if [ $? -eq 0 ]; then
+                    log "✓ Successfully uploaded: $dvc_file"
+                else
+                    log "✗ Failed to upload: $dvc_file" >&2
+                    exit 1
+                fi
+            fi
+        done
+    fi
+done
+
+# Continue with push
+log "Pre-push DVC metadata check completed"
+exit 0

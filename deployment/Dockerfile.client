@@ -1,0 +1,134 @@
+FROM python:3.12-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    sudo \
+    openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv directly from GitHub releases
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add uv to PATH
+ENV PATH="/root/.local/bin:$PATH"
+
+# Install DVC and git
+RUN uv pip install --system dvc[all] && \
+    git config --global user.name "Demo User" && \
+    git config --global user.email "demo@hillstonenet.com" && \
+    git config --global init.defaultBranch master
+
+# Copy DVC hooks installation script
+COPY collect-metadata/install-dvc-hooks.sh /usr/local/bin/install-dvc-hooks.sh
+COPY collect-metadata/post-commit /usr/local/share/dvc-hooks/post-commit
+COPY collect-metadata/pre-push /usr/local/share/dvc-hooks/pre-push
+
+# Make scripts executable
+RUN chmod +x /usr/local/bin/install-dvc-hooks.sh && \
+    chmod +x /usr/local/share/dvc-hooks/post-commit && \
+    chmod +x /usr/local/share/dvc-hooks/pre-push
+
+# Create a script to install hooks globally
+RUN cat > /usr/local/bin/setup-dvc-hooks << 'EOF'
+#!/bin/bash
+# Global DVC hooks setup script
+
+set -e
+
+HOOKS_DIR="$1/.git/hooks"
+if [ ! -d "$HOOKS_DIR" ]; then
+    echo "Error: $1 is not a git repository"
+    exit 1
+fi
+
+# Copy hooks
+cp /usr/local/share/dvc-hooks/post-commit "$HOOKS_DIR/post-commit"
+cp /usr/local/share/dvc-hooks/pre-push "$HOOKS_DIR/pre-push"
+chmod +x "$HOOKS_DIR/post-commit"
+chmod +x "$HOOKS_DIR/pre-push"
+
+# Update server URL in hooks
+sed -i "s|http://localhost:8383|http://server:${SERVER_PORT:-8000}|g" "$HOOKS_DIR/post-commit"
+sed -i "s|http://localhost:8383|http://server:${SERVER_PORT:-8000}|g" "$HOOKS_DIR/pre-push"
+
+echo "DVC hooks installed in $1"
+EOF
+
+RUN chmod +x /usr/local/bin/setup-dvc-hooks
+
+# Create user setup script
+RUN cat > /usr/local/bin/setup-users << 'EOF'
+#!/bin/bash
+# Setup users for client containers
+
+set -e
+
+# Create users with home directories and sudo access
+create_user() {
+    local username=$1
+    local password=$2
+    
+    if ! id "$username" &>/dev/null; then
+        useradd -m -s /bin/bash "$username"
+        echo "$username:$password" | chpasswd
+        usermod -aG sudo "$username"
+
+        # Setup git config for user
+        sudo -u "$username" git config --global user.name "$username"
+        sudo -u "$username" git config --global user.email "$username@hillstonenet.com"
+        sudo -u "$username" git config --global init.defaultBranch master
+        
+        echo "User $username created successfully"
+    else
+        echo "User $username already exists"
+    fi
+}
+
+# Container A: alice and bob
+if [ "$CONTAINER_NAME" = "client_a" ]; then
+    create_user "alice" "alice123"
+    create_user "bob" "bob123"
+fi
+
+# Container B: cindy
+if [ "$CONTAINER_NAME" = "client_b" ]; then
+    create_user "cindy" "cindy123"
+fi
+EOF
+
+RUN chmod +x /usr/local/bin/setup-users
+
+# Copy setup demo script
+COPY test/setup-demo.sh /usr/local/bin/setup-demo.sh
+RUN chmod +x /usr/local/bin/setup-demo.sh
+
+# Create entrypoint script
+RUN cat > /entrypoint.sh << 'EOF'
+#!/bin/bash
+# Entrypoint script for client containers
+
+set -e
+
+# Setup users based on container type
+export CONTAINER_NAME=${CONTAINER_NAME:-client_a}
+setup-users
+
+# SSH service disabled for demo - containers work without SSH
+# To enable SSH, ensure proper network connectivity and proxy settings
+echo "SSH service disabled for demo"
+
+# Keep container running for demo
+echo "Starting container and keeping it alive..."
+tail -f /dev/null
+EOF
+
+RUN chmod +x /entrypoint.sh
+
+# Expose SSH port
+EXPOSE 22
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]
