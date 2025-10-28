@@ -24,12 +24,6 @@ FORCE=false
 # Tables to clean (keeping users)
 TABLES_TO_CLEAN=("data_items" "uploaded_metadata" "upload_logs")
 
-# Directories to clean
-CLEANUP_DIRECTORIES=(
-    "dvc_storage"
-    "/tmp/rdm/uploads"
-)
-
 # Logging function
 log() {
     local level=$1
@@ -56,6 +50,11 @@ OPTIONS:
     --dry-run, -n       Show what would be deleted without actually deleting
     --force, -f         Skip confirmation prompts
     --help, -h          Show this help message
+
+REQUIREMENTS:
+    - sqlite3 (for database cleanup)
+    - yq (for reading config.yml)
+    - docker compose (for container management)
 
 EXAMPLES:
     ./test/cleanup.sh                    # Full cleanup with confirmation
@@ -90,11 +89,91 @@ parse_args() {
     done
 }
 
+# Load cleanup directories from config.yml
+load_cleanup_directories() {
+    local config_file="$PROJECT_ROOT/config.yml"
+    
+    if [ ! -f "$config_file" ]; then
+        log "ERROR" "config.yml not found at $config_file"
+        exit 1
+    fi
+    
+    log "INFO" "Loading cleanup directories from config.yml..."
+    
+    # Extract paths using yq
+    local storage_path=$(yq eval '.dvc.storage_path' "$config_file" 2>/dev/null)
+    local uploads_path=$(yq eval '.dvc.uploads_dvc_project' "$config_file" 2>/dev/null)
+    
+    # Validate paths were extracted
+    if [ -z "$storage_path" ] || [ "$storage_path" = "null" ]; then
+        log "ERROR" "Could not extract dvc.storage_path from config.yml"
+        exit 1
+    fi
+    
+    if [ -z "$uploads_path" ] || [ "$uploads_path" = "null" ]; then
+        log "ERROR" "Could not extract dvc.uploads_dvc_project from config.yml"
+        exit 1
+    fi
+    
+    # Build CLEANUP_DIRECTORIES array
+    CLEANUP_DIRECTORIES=()
+    
+    # Handle storage_path
+    if [[ "$storage_path" == "$PROJECT_ROOT"* ]]; then
+        # Convert absolute path within project to relative
+        local rel_path="${storage_path#$PROJECT_ROOT/}"
+        CLEANUP_DIRECTORIES+=("$rel_path")
+    else
+        # Keep absolute paths as-is
+        CLEANUP_DIRECTORIES+=("$storage_path")
+    fi
+    
+    # Handle uploads_path
+    if [[ "$uploads_path" == "$PROJECT_ROOT"* ]]; then
+        # Convert absolute path within project to relative
+        local rel_path="${uploads_path#$PROJECT_ROOT/}"
+        CLEANUP_DIRECTORIES+=("$rel_path")
+    else
+        # Keep absolute paths as-is
+        CLEANUP_DIRECTORIES+=("$uploads_path")
+    fi
+    
+    # Remove duplicates while preserving order
+    local temp_array=()
+    local seen_paths=""
+    for dir in "${CLEANUP_DIRECTORIES[@]}"; do
+        if [[ "$seen_paths" != *"$dir"* ]]; then
+            temp_array+=("$dir")
+            seen_paths="$seen_paths $dir"
+        fi
+    done
+    CLEANUP_DIRECTORIES=("${temp_array[@]}")
+    
+    log "INFO" "Cleanup directories loaded: ${CLEANUP_DIRECTORIES[*]}"
+}
+
 # Check if we're in the correct directory
 check_prerequisites() {
     # Check if sqlite3 is available
     if ! command -v sqlite3 >/dev/null 2>&1; then
         log "ERROR" "sqlite3 is not installed. Please install sqlite3 to use this script."
+        exit 1
+    fi
+    
+    # Check if yq is available
+    if ! command -v yq >/dev/null 2>&1; then
+        log "ERROR" "yq is not installed. Please install yq to use this script."
+        exit 1
+    fi
+    
+    # Check if docker compose is available
+    if ! command -v docker >/dev/null 2>&1; then
+        log "ERROR" "docker is not installed. Please install docker to use this script."
+        exit 1
+    fi
+    
+    if ! docker compose version >/dev/null 2>&1; then
+        log "ERROR" "docker compose is not available. Please ensure you have docker compose plugin installed."
         exit 1
     fi
     
@@ -104,8 +183,15 @@ check_prerequisites() {
         exit 1
     fi
     
+    # Check if config.yml exists
+    if [ ! -f "$PROJECT_ROOT/config.yml" ]; then
+        log "ERROR" "config.yml not found at $PROJECT_ROOT/config.yml"
+        exit 1
+    fi
+    
     log "INFO" "Project root: $PROJECT_ROOT"
     log "INFO" "Database file: $DB_FILE"
+    log "INFO" "Config file: $PROJECT_ROOT/config.yml"
 }
 
 # Confirm cleanup operation
@@ -128,7 +214,7 @@ confirm_cleanup() {
     done
     echo "   • users table will be preserved"
     echo ""
-    echo "File Storage Directories:"
+    echo "File Storage Directories (contents will be removed, directories kept):"
     for dir in "${CLEANUP_DIRECTORIES[@]}"; do
         echo "   • $dir"
     done
@@ -147,11 +233,9 @@ confirm_cleanup() {
 cleanup_docker() {
     log "INFO" "Cleaning Docker resources..."
     
-    cd "$SCRIPT_DIR"
-    
     if [ "$DRY_RUN" = true ]; then
-        log "DRYRUN" "Would stop and remove containers: docker-compose down --volumes --remove-orphans"
-        log "DRYRUN" "Would remove images: docker-compose down --rmi all"
+        log "DRYRUN" "Would stop and remove containers: docker compose -f \"$COMPOSE_FILE\" down --volumes --remove-orphans"
+        log "DRYRUN" "Would remove images: docker compose -f \"$COMPOSE_FILE\" down --rmi all"
         return 0
     fi
     
@@ -163,7 +247,7 @@ cleanup_docker() {
     
     # Stop and remove containers, volumes, and orphans
     log "INFO" "Stopping and removing containers, volumes, and orphans..."
-    if docker-compose down --volumes --remove-orphans 2>/dev/null; then
+    if docker compose -f "$COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null; then
         log "INFO" "✓ Containers, volumes, and orphans removed"
     else
         log "WARN" "Some containers/volumes may not exist or couldn't be removed"
@@ -171,7 +255,7 @@ cleanup_docker() {
     
     # Remove images
     log "INFO" "Removing Docker images..."
-    if docker-compose down --rmi all 2>/dev/null; then
+    if docker compose -f "$COMPOSE_FILE" down --rmi all 2>/dev/null; then
         log "INFO" "✓ Docker images removed"
     else
         log "WARN" "Some images may not exist or couldn't be removed"
@@ -226,7 +310,7 @@ cleanup_database() {
 cleanup_directories() {
     log "INFO" "Cleaning directories..."
     
-    local dirs_removed=0
+    local dirs_cleaned=0
     
     for dir in "${CLEANUP_DIRECTORIES[@]}"; do
         # Handle relative vs absolute paths
@@ -238,22 +322,34 @@ cleanup_directories() {
         
         if [ -d "$full_path" ]; then
             if [ "$DRY_RUN" = true ]; then
-                log "DRYRUN" "Would remove directory: $dir"
-                dirs_removed=$((dirs_removed + 1))
+                log "DRYRUN" "Would clean contents of directory: $dir"
+                dirs_cleaned=$((dirs_cleaned + 1))
             else
-                log "INFO" "Removing directory: $dir"
-                # Some directories might have restricted permissions
-                if rm -rf "$full_path" 2>/dev/null; then
-                    dirs_removed=$((dirs_removed + 1))
-                    log "INFO" "✓ Removed directory: $dir"
-                else
-                    log "WARN" "Directory $dir might need elevated permissions. Trying with sudo..."
-                    if sudo rm -rf "$full_path" 2>/dev/null; then
-                        dirs_removed=$((dirs_removed + 1))
-                        log "INFO" "✓ Removed directory with sudo: $dir"
+                log "INFO" "Cleaning contents of directory: $dir"
+                
+                # Check if directory has contents
+                local has_contents=false
+                if [ -n "$(ls -A "$full_path" 2>/dev/null)" ]; then
+                    has_contents=true
+                fi
+                
+                if [ "$has_contents" = true ]; then
+                    # Remove all contents but keep the directory
+                    if rm -rf "$full_path"/* "$full_path"/.[^.] 2>/dev/null; then
+                        dirs_cleaned=$((dirs_cleaned + 1))
+                        log "INFO" "✓ Cleaned contents of directory: $dir"
                     else
-                        log "WARN" "Failed to remove directory: $dir"
+                        log "WARN" "Directory $dir might need elevated permissions. Trying with sudo..."
+                        if sudo rm -rf "$full_path"/* "$full_path"/.[^.] 2>/dev/null; then
+                            dirs_cleaned=$((dirs_cleaned + 1))
+                            log "INFO" "✓ Cleaned contents with sudo: $dir"
+                        else
+                            log "WARN" "Failed to clean directory: $dir"
+                        fi
                     fi
+                else
+                    dirs_cleaned=$((dirs_cleaned + 1))
+                    log "INFO" "✓ Directory $dir is already empty"
                 fi
             fi
         else
@@ -262,9 +358,9 @@ cleanup_directories() {
     done
     
     if [ "$DRY_RUN" = true ]; then
-        log "DRYRUN" "Would remove $dirs_removed directories"
+        log "DRYRUN" "Would clean $dirs_cleaned directories"
     else
-        log "INFO" "✓ Removed $dirs_removed directories"
+        log "INFO" "✓ Cleaned $dirs_cleaned directories"
     fi
 }
 
@@ -278,8 +374,7 @@ show_summary() {
         log "INFO" "Test environment cleanup complete!"
         echo ""
         log "INFO" "Next steps:"
-        echo "   1. Run 'docker-compose up -d' to start the test client"
-        echo "   2. Run 'docker exec rdm-test-client /test/setup-dev-client.sh' to setup"
+        echo "Run 'docker compose -f test/docker-compose.yml up -d' to start the test client"
         echo ""
     fi
 }
@@ -291,6 +386,7 @@ main() {
     
     parse_args "$@"
     check_prerequisites
+    load_cleanup_directories
     
     # Show what will be done
     if [ "$DRY_RUN" = true ]; then

@@ -127,16 +127,23 @@ class TestDVCUploadHandling:
     @pytest.fixture
     def test_user(self, db_session):
         """Create a test user"""
+        test_email = "pytest@hillstonenet.com"
         user = db_session.query(User).filter(
-            User.email == "test@example.com").first()
+            User.email == test_email).first()
         if user is None:
-            user = User(email="test@example.com",
+            user = User(email=test_email,
                         hashed_password="test_password_hash",
                         is_admin=False)
             db_session.add(user)
             db_session.commit()
             db_session.refresh(user)
-        return user
+        
+        yield user
+        
+        # Cleanup
+        if user:
+            db_session.delete(user)
+            db_session.commit()
 
     def test_handle_dvc_upload_data_item_creation(self, db_session, test_user):
         """Test handle_dvc_upload_data_item_creation function"""
@@ -188,58 +195,6 @@ class TestDVCUploadHandling:
             if dvc_file and dvc_file.exists():
                 dvc_file.unlink()
 
-    def test_handle_dvc_upload_with_debug(self, db_session, test_user):
-        """Test handle_dvc_upload_data_item_creation with pdb debugging"""
-        # Create a test file
-        temp_file = None
-        dvc_file = None
-
-        try:
-            with tempfile.NamedTemporaryFile(delete=False) as f:
-                f.write(b"test content")
-                temp_file = Path(f.name)
-
-            # Create a corresponding DVC file
-            dvc_content = {
-                'outs': [{
-                    'path': 'test_file.txt',
-                    'size': 12,
-                    'nfiles': 1,
-                    'md5': '473eee96816e270cfcbc2813602413b9'
-                }]
-            }
-
-            dvc_file = temp_file.parent / f"{temp_file.name}.dvc"
-            with open(dvc_file, 'w') as f:
-                yaml.dump(dvc_content, f)
-
-            file_path = "files/md5/47/3eee96816e270cfcbc2813602413b9"
-            full_path = temp_file
-
-            # Set breakpoint and call the function
-            import pdb
-            pdb.set_trace()
-
-            result = handle_dvc_upload_data_item_creation(file_path=file_path,
-                                                          full_path=full_path,
-                                                          user=test_user,
-                                                          db=db_session)
-
-            assert result is not None
-            print(f"Function returned: {result}")
-
-            if result:
-                # Cleanup
-                db_session.delete(result)
-                db_session.commit()
-
-        finally:
-            # Cleanup temp files
-            if temp_file and temp_file.exists():
-                temp_file.unlink()
-            if dvc_file and dvc_file.exists():
-                dvc_file.unlink()
-
 
 class TestServerEndpoints:
     """Test server endpoints"""
@@ -258,20 +213,32 @@ class TestServerEndpoints:
         assert route_count > 0
 
 
-# if __name__ == "__main__":
-#     if len(sys.argv) > 1:
-#         if sys.argv[1] == "--standalone":
-#             run_standalone_tests()
-#         elif sys.argv[1] == "--help":
-#             print("Usage: python test/test_combined.py [option]")
-#             print("Options:")
-#             print("  --standalone    Run standalone tests without pytest")
-#             print("  --help          Show this help message")
-#             print()
-#             print("To run with pytest:")
-#             print("  uv run pytest test/test_combined.py -v")
-#             print("  uv run pytest test/test_combined.py -v -k test_name")
-#         else:
-#             print("Unknown option. Use --help for usage information.")
-#     else:
-#         pytest.main([__file__, "-v"])
+class TestDownloadFeatures:
+    """Test DVC download handling functions"""
+
+    @pytest.fixture
+    def db_session(self):
+        """Create a test database session"""
+        db = next(get_db())
+        try:
+            yield db
+        finally:
+            db.close()
+
+    @pytest.fixture
+    def test_params(self, db_session):
+        """Create a test user"""
+        downloading_user = "cli4168@hillstonenet.com"  # the logined user who clicked the "Download data" button
+        data_item_id = 1  # the ID of data item to be downloaded. Get it in web UI by right click the download button then "onclick"
+        user = db_session.query(User).filter(
+            User.email == downloading_user).first()
+        failure_message = f"User {downloading_user} not exist! Register on web UI."
+        assert user is not None, failure_message
+        return {"item_id": data_item_id, "user": user}
+
+    def test_download_data_item(self, db_session, test_params):
+        from backend.routers.data import get_data_item
+        result = get_data_item(item_id=test_params['item_id'],
+                              db=db_session,
+                              current_user=test_params['user'])
+        assert result is not None

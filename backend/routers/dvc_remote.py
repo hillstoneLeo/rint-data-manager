@@ -18,6 +18,8 @@ router = APIRouter()
 
 DVC_STORAGE_PATH = Path(
     config.dvc_config.get('storage_path', '/opt/dvc_storage'))
+warnning_msg = f'DVC_STORAGE_PATH: {DVC_STORAGE_PATH} not exist!'
+assert DVC_STORAGE_PATH.exists(), warnning_msg
 
 
 def create_data_item_from_dvc_upload(
@@ -74,7 +76,7 @@ def extract_metadata_from_dvc_file(dvc_file_path: Path) -> Dict[str, Any]:
         'file_size': None,
         'project': None
     }
-    
+
     try:
         if dvc_file_path.exists():
             with open(dvc_file_path, 'r') as f:

@@ -1,0 +1,61 @@
+#!/bin/bash
+# Enhanced setup users script that handles test_client case
+
+set -e
+
+# Function to print timestamped messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+# Create users with home directories
+create_user() {
+    local username=$1
+    local password=$2
+    
+    if ! id "$username" &>/dev/null; then
+        useradd -m -s /bin/bash "$username"
+        echo "$username:$password" | chpasswd
+
+        # Setup git config for user if git is available
+        if command -v git &> /dev/null; then
+            su - "$username" -c "git config --global user.name '$username'"
+            su - "$username" -c "git config --global user.email '$username@hillstonenet.com'"
+            su - "$username" -c "git config --global init.defaultBranch master"
+        else
+            log "Git not available, skipping git config setup"
+        fi
+        
+        log "User $username created successfully"
+    else
+        log "User $username already exists, ensuring git config is set..."
+        # Ensure git config is set even for existing users
+        if command -v git &> /dev/null; then
+            su - "$username" -c "git config --global user.name '$username'" || true
+            su - "$username" -c "git config --global user.email '$username@hillstonenet.com'" || true
+            su - "$username" -c "git config --global init.defaultBranch master" || true
+        else
+            log "Git not available, skipping git config setup"
+        fi
+    fi
+}
+
+# Container A: alice and bob
+if [ "$CONTAINER_NAME" = "client_a" ]; then
+    create_user "alice" "alice123"
+    create_user "bob" "bob123"
+fi
+
+# Container B: cindy
+if [ "$CONTAINER_NAME" = "client_b" ]; then
+    create_user "cindy" "cindy123"
+fi
+
+# Test Client: alice and bob (for development testing)
+if [ "$CONTAINER_NAME" = "test_client" ]; then
+    log "Setting up users for test_client container..."
+    create_user "alice" "alice123"
+    create_user "bob" "bob123"
+fi
+
+log "User setup completed for CONTAINER_NAME=$CONTAINER_NAME"

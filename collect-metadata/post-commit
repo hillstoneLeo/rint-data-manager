@@ -14,11 +14,12 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
-# Configuration - use environment variable or default
-SERVER_URL="http://localhost:${SERVER_PORT:-8000}/api/data/upload-metadata"
+# DVC_SERVER_IP and DVC_SERVER_PORT come from /etc/environment
+DVC_SERVER_URL="http://${DVC_SERVER_IP:-dummyIP}:${DVC_SERVER_PORT:-dummyPort}/api/data/upload-metadata"
+log "DVC metadata server URL: $DVC_SERVER_URL"
 
 # Get DVC user if available, fallback to system user
-DVC_USER=$(dvc config core.user 2>/dev/null || echo "${USER:-$(whoami)}")
+DVC_USER=$(whoami)@hillstonenet.com
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT"
@@ -32,7 +33,7 @@ find . -name "*.dvc" -type f | while read -r dvc_file; do
     
     log "Uploading metadata for: $dvc_file"
     
-    curl -X POST "$SERVER_URL" \
+    curl -X POST "$DVC_SERVER_URL" \
          -F "dvc_file=@$dvc_file" \
          -F "username=$DVC_USER" \
          --silent --show-error --fail

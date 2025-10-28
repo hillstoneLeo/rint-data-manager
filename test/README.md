@@ -43,16 +43,14 @@ brew install sqlite3
    
    # Set your actual dev server IP
    DEV_SERVER_IP=10.160.43.82
+   
+   # Optional: Skip DVC setup (default: yes)
+   SETUP_DVC=no
    ```
 
 2. **Build and start the container**:
    ```bash
    docker-compose up -d
-   ```
-
-3. **Run the development setup script**:
-   ```bash
-   docker exec rdm-test-client /test/setup-dev-client.sh
    ```
 
 ## Usage
@@ -117,6 +115,12 @@ dvc push
 - Uses `network_mode: host` for direct access to development network
 - Can access servers on `10.160.43.0/24` network
 - No proxy interference with local network access
+
+### Environment Variables
+
+- **DEV_SERVER_IP**: Development server IP address (default: `10.160.43.100`)
+- **DEV_SERVER_PORT**: Development server port (default: `8383`)
+- **SETUP_DVC**: Whether to run DVC setup automatically (default: `yes`, set to `no` to skip)
 
 ### DVC Configuration
 

@@ -1,0 +1,57 @@
+#!/bin/bash
+# Setup UV project by copying demo-project template
+
+set -e
+
+# Function to print timestamped messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+# Function to setup UV project for user by copying demo-project
+setup_uv_project() {
+    local username=$1
+    local project_name=$2
+    
+    log "Setting up UV project for $username..."
+    
+    # Copy demo-project template to user's home directory
+    cp -r /tmp/demo-project "/home/$username/$project_name"
+    
+    # Fix ownership of copied project
+    chown -R "$username:$username" "/home/$username/$project_name"
+    
+    # Initialize Git repository if git is available
+    cd "/home/$username/$project_name"
+    if [ ! -d ".git" ]; then
+        if command -v git &> /dev/null; then
+            echo "Initializing Git repository for $username..."
+            su - "$username" -c "cd /home/$username/$project_name && git init"
+            su - "$username" -c "cd /home/$username/$project_name && git add ."
+            su - "$username" -c "cd /home/$username/$project_name && git commit -m 'Initial project setup'" || true
+        else
+            log "Git not available, skipping repository initialization"
+        fi
+    fi
+    
+    # Note: DVC will be configured later by dev setup script
+    
+    log "✓ UV project setup complete for $username"
+}
+
+# Setup UV projects for users
+if [ "$CONTAINER_NAME" = "client_a" ]; then
+    setup_uv_project "alice" "demo-project"
+    setup_uv_project "bob" "data-analysis"
+fi
+
+if [ "$CONTAINER_NAME" = "client_b" ]; then
+    setup_uv_project "cindy" "ml-experiment"
+fi
+
+if [ "$CONTAINER_NAME" = "test_client" ]; then
+    setup_uv_project "alice" "demo-project"
+    setup_uv_project "bob" "data-analysis"
+fi
+
+log "UV project setup complete!"
