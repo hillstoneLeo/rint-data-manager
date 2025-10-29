@@ -300,8 +300,7 @@ async def create_data_item(file: UploadFile, data: DataItemCreate, user: User,
 
 def get_data_item_with_lineage(db: Session, item_id: int,
                                user: User) -> Optional[DataItem]:
-    return db.query(DataItem).filter(DataItem.id == item_id,
-                                     DataItem.user_id == user.id).first()
+    return db.query(DataItem).filter(DataItem.id == item_id).first()
 
 
 @timing_logger
